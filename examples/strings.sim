@@ -1,0 +1,13 @@
+program Strings;
+begin
+    string first;
+    string second;
+    string joined;
+    first := "Free ";
+    second := "Simula";
+    joined := first + second;
+    assert(joined = "Free Simula");
+    outtext(joined);
+    outimage;
+    exit(0)
+end;

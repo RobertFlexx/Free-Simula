@@ -1,0 +1,15 @@
+const integer Answer = 42;
+type Counter = integer;
+enum Direction begin North = 1, East, South, West end;
+
+program ConstantsAndEnums;
+begin
+    Counter value;
+    value := Answer;
+    assert(value = 42);
+    assert(North = 1);
+    assert(West = 4);
+    outint(value);
+    outimage;
+    exit(0)
+end;

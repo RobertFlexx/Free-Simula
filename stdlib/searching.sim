@@ -1,0 +1,63 @@
+module Searching;
+
+integer function LinearSearch(array[0:1023] of integer values,
+  integer count, integer needle);
+begin
+    integer index;
+    index := 0;
+    while index < count do
+    begin
+        if values[index] = needle then
+            return index;
+        index := index + 1
+    end;
+    return -1
+end;
+
+integer function LowerBound(array[0:1023] of integer values,
+  integer count, integer needle);
+begin
+    integer first;
+    integer remaining;
+    integer step;
+    integer middle;
+    first := 0;
+    remaining := count;
+    while remaining > 0 do
+    begin
+        step := remaining // 2;
+        middle := first + step;
+        if values[middle] < needle then
+        begin
+            first := middle + 1;
+            remaining := remaining - step - 1
+        end
+        else
+            remaining := step
+    end;
+    return first
+end;
+
+integer function UpperBound(array[0:1023] of integer values,
+  integer count, integer needle);
+begin
+    integer first;
+    integer remaining;
+    integer step;
+    integer middle;
+    first := 0;
+    remaining := count;
+    while remaining > 0 do
+    begin
+        step := remaining // 2;
+        middle := first + step;
+        if values[middle] <= needle then
+        begin
+            first := middle + 1;
+            remaining := remaining - step - 1
+        end
+        else
+            remaining := step
+    end;
+    return first
+end;

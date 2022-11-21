@@ -1,0 +1,13 @@
+program Arithmetic;
+begin
+    integer left;
+    integer right;
+    integer result;
+    left := 21;
+    right := 2;
+    result := left * right;
+    assert(result = 42);
+    outint(result);
+    outimage;
+    exit(0)
+end;

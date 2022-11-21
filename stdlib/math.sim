@@ -1,0 +1,69 @@
+module Math;
+
+integer function Abs(integer value);
+begin
+    if value < 0 then
+        return -value
+    else
+        return value
+end;
+
+integer function Min(integer left, integer right);
+begin
+    if left < right then
+        return left
+    else
+        return right
+end;
+
+integer function Max(integer left, integer right);
+begin
+    if left > right then
+        return left
+    else
+        return right
+end;
+
+integer function Clamp(integer value, integer lower, integer upper);
+begin
+    if value < lower then
+        return lower
+    else if value > upper then
+        return upper
+    else
+        return value
+end;
+
+integer function GreatestCommonDivisor(integer left, integer right);
+begin
+    integer temporary;
+    left := Abs(left);
+    right := Abs(right);
+    while right <> 0 do
+    begin
+        temporary := left mod right;
+        left := right;
+        right := temporary;
+    end;
+    return left
+end;
+
+integer function LeastCommonMultiple(integer left, integer right);
+begin
+    integer divisor;
+    divisor := GreatestCommonDivisor(left, right);
+    if divisor = 0 then
+        return 0
+    else
+        return Abs((left // divisor) * right)
+end;
+
+boolean function IsEven(integer value);
+begin
+    return (value mod 2) = 0
+end;
+
+boolean function IsOdd(integer value);
+begin
+    return not IsEven(value)
+end;

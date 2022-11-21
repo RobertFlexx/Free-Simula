@@ -1,0 +1,61 @@
+module Sorting;
+
+Procedure InsertionSort(array[0:1023] of integer values, integer count);
+begin
+    integer index;
+    integer scan;
+    integer value;
+    index := 1;
+    while index < count do
+    begin
+        value := values[index];
+        scan := index - 1;
+        while (scan >= 0) and (values[scan] > value) do
+        begin
+            values[scan + 1] := values[scan];
+            scan := scan - 1
+        end;
+        values[scan + 1] := value;
+        index := index + 1
+    end
+end;
+
+Procedure SelectionSort(array[0:1023] of integer values, integer count);
+begin
+    integer index;
+    integer scan;
+    integer minimum_index;
+    integer temporary;
+    index := 0;
+    while index < count do
+    begin
+        minimum_index := index;
+        scan := index + 1;
+        while scan < count do
+        begin
+            if values[scan] < values[minimum_index] then
+                minimum_index := scan;
+            scan := scan + 1
+        end;
+        if minimum_index <> index then
+        begin
+            temporary := values[index];
+            values[index] := values[minimum_index];
+            values[minimum_index] := temporary
+        end;
+        index := index + 1
+    end
+end;
+
+boolean function IsSorted(array[0:1023] of integer values, integer count);
+begin
+    integer index;
+    index := 1;
+    while index < count do
+    begin
+        if values[index - 1] > values[index] then
+            return false;
+        index := index + 1
+    end;
+    return true
+end;

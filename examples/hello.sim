@@ -1,0 +1,6 @@
+program Hello;
+begin
+    outtext("Hello from Free Simula 1.6.1");
+    outimage;
+    exit(0)
+end;

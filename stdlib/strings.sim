@@ -1,0 +1,21 @@
+module Strings;
+
+string function EmptyString;
+begin
+    return ""
+end;
+
+string function Join(string left, string right);
+begin
+    return left + right
+end;
+
+boolean function StringEquals(string left, string right);
+begin
+    return left = right
+end;
+
+boolean function StringNotEquals(string left, string right);
+begin
+    return left <> right
+end;

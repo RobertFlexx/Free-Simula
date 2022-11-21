@@ -1,0 +1,14 @@
+integer function Square(integer value);
+begin
+    return value * value
+end;
+
+program Functions;
+begin
+    integer answer;
+    answer := Square(9);
+    assert(answer = 81);
+    outint(answer);
+    outimage;
+    exit(0)
+end;

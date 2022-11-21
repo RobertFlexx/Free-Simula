@@ -1,0 +1,22 @@
+program ControlFlow;
+begin
+    integer index;
+    integer total;
+    index := 1;
+    total := 0;
+    while index <= 10 do
+    begin
+        total := total + index;
+        index := index + 1;
+    end;
+    if total = 55 then
+    begin
+        outtext("control flow verified");
+    end
+    else
+    begin
+        outtext("control flow failed");
+    end;
+    outimage;
+    exit(0)
+end;
