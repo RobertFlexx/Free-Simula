@@ -1,0 +1,10 @@
+program UnicodeSource;
+begin
+    var résumé: integer := 40;
+    var Δelta: integer := 2;
+    résumé := résumé + Δelta;
+    assert(résumé = 42);
+    outint(résumé);
+    outimage;
+    exit(0)
+end;
