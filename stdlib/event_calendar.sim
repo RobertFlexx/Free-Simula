@@ -1,0 +1,40 @@
+module EventCalendar;
+
+Class CalendarEntry;
+begin
+    Private:
+    integer event_time;
+    integer event_priority;
+    boolean active;
+    Public:
+    Procedure Schedule(integer time_value, integer priority_value);
+    begin
+        event_time := time_value;
+        event_priority := priority_value;
+        active := true
+    end;
+    Procedure Cancel;
+    begin
+        active := false
+    end;
+    integer function EventTime;
+    begin
+        return event_time
+    end;
+    integer function Priority;
+    begin
+        return event_priority
+    end;
+    boolean function Active;
+    begin
+        return active
+    end;
+    boolean function Precedes(Ref(CalendarEntry) other);
+    begin
+        if event_time < other.EventTime() then
+            return true;
+        if event_time > other.EventTime() then
+            return false;
+        return event_priority < other.Priority()
+    end;
+end;

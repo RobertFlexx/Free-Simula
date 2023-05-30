@@ -1,0 +1,43 @@
+module Tasking;
+
+Task Class WorkItem;
+Virtual: Procedure Execute Is Procedure Execute;;
+begin
+    Private:
+    boolean completed;
+    boolean failed;
+    integer result_value;
+    Public:
+    Procedure Execute;
+    begin
+    end;
+    Procedure Complete(integer value);
+    begin
+        result_value := value;
+        completed := true;
+        failed := false
+    end;
+    Procedure Fail;
+    begin
+        result_value := 0;
+        completed := true;
+        failed := true
+    end;
+    boolean function Completed;
+    begin
+        return completed
+    end;
+    boolean function Failed;
+    begin
+        return failed
+    end;
+    integer function Result;
+    begin
+        return result_value
+    end;
+end;
+
+Procedure SchedulerYield;
+begin
+    yield
+end;

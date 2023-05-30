@@ -1,0 +1,92 @@
+module Synchronization;
+
+Class GuardedCounter;
+begin
+    Private:
+    mutex guard;
+    integer counter_value;
+
+    Public:
+    Procedure Increment;
+    begin
+        lock guard;
+        counter_value := counter_value + 1;
+        unlock guard
+    end;
+
+    Procedure Add(integer amount);
+    begin
+        lock guard;
+        counter_value := counter_value + amount;
+        unlock guard
+    end;
+
+    integer function Read;
+    begin
+        integer snapshot;
+        lock guard;
+        snapshot := counter_value;
+        unlock guard;
+        return snapshot
+    end;
+end;
+
+Procedure Acquire(mutex guard);
+begin
+    lock guard
+end;
+
+boolean function TryAcquire(mutex guard);
+begin
+    return mutex_try_lock(guard)
+end;
+
+Procedure Release(mutex guard);
+begin
+    unlock guard
+end;
+
+Procedure InitializeSemaphore(semaphore gate, integer permits);
+begin
+    semaphore_init(gate, permits)
+end;
+
+Procedure WaitSemaphore(semaphore gate);
+begin
+    semaphore_wait(gate)
+end;
+
+boolean function TryWaitSemaphore(semaphore gate);
+begin
+    return semaphore_try_wait(gate)
+end;
+
+Procedure PostSemaphore(semaphore gate);
+begin
+    semaphore_post(gate)
+end;
+
+Procedure InitializeBarrier(barrier rendezvous, integer parties);
+begin
+    barrier_init(rendezvous, parties)
+end;
+
+boolean function WaitBarrier(barrier rendezvous);
+begin
+    return barrier_wait(rendezvous)
+end;
+
+Procedure WaitCondition(condition event, mutex guard);
+begin
+    condition_wait(event, guard)
+end;
+
+Procedure SignalCondition(condition event);
+begin
+    condition_signal(event)
+end;
+
+Procedure BroadcastCondition(condition event);
+begin
+    condition_broadcast(event)
+end;

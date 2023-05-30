@@ -1,0 +1,92 @@
+module IntegerCollections;
+
+Class IntegerStack;
+begin
+    Private:
+    array[0:255] of integer items;
+    integer item_count;
+    Public:
+    Procedure Clear;
+    begin
+        item_count := 0
+    end;
+    boolean function Empty;
+    begin
+        return item_count = 0
+    end;
+    integer function Count;
+    begin
+        return item_count
+    end;
+    boolean function Push(integer value);
+    begin
+        if item_count >= 256 then
+            return false;
+        items[item_count] := value;
+        item_count := item_count + 1;
+        return true
+    end;
+    integer function Peek;
+    begin
+        if item_count = 0 then
+            return 0;
+        return items[item_count - 1]
+    end;
+    integer function Pop;
+    begin
+        integer value;
+        if item_count = 0 then
+            return 0;
+        item_count := item_count - 1;
+        value := items[item_count];
+        return value
+    end;
+end;
+
+Class IntegerQueue;
+begin
+    Private:
+    array[0:255] of integer items;
+    integer first_index;
+    integer item_count;
+    Public:
+    Procedure Clear;
+    begin
+        first_index := 0;
+        item_count := 0
+    end;
+    boolean function Empty;
+    begin
+        return item_count = 0
+    end;
+    integer function Count;
+    begin
+        return item_count
+    end;
+    boolean function Enqueue(integer value);
+    begin
+        integer insertion_index;
+        if item_count >= 256 then
+            return false;
+        insertion_index := (first_index + item_count) mod 256;
+        items[insertion_index] := value;
+        item_count := item_count + 1;
+        return true
+    end;
+    integer function Front;
+    begin
+        if item_count = 0 then
+            return 0;
+        return items[first_index]
+    end;
+    integer function Dequeue;
+    begin
+        integer value;
+        if item_count = 0 then
+            return 0;
+        value := items[first_index];
+        first_index := (first_index + 1) mod 256;
+        item_count := item_count - 1;
+        return value
+    end;
+end;

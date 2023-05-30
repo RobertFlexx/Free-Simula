@@ -1,0 +1,68 @@
+module ClassicQueue;
+
+Link Class QueueLink;
+begin
+    Private:
+    integer stored_value;
+    Public:
+    Procedure SetValue(integer value);
+    begin
+        stored_value := value
+    end;
+    integer function Value;
+    begin
+        return stored_value
+    end
+end;
+
+Class Queue;
+begin
+    Private:
+    Ref(Head) members;
+    Public:
+    Procedure Initialize;
+    begin
+        members :- new Head()
+    end;
+    boolean function Empty;
+    begin
+        return members.empty()
+    end;
+    integer function Count;
+    begin
+        return members.cardinal()
+    end;
+    Procedure Enqueue(Ref(QueueLink) item);
+    begin
+        item.into(members)
+    end;
+    Ref(QueueLink) function Front;
+    begin
+        Ref(Link) item;
+        item :- members.first();
+        if item == none then
+            return none;
+        return item qua QueueLink
+    end;
+    Ref(QueueLink) function Back;
+    begin
+        Ref(Link) item;
+        item :- members.last();
+        if item == none then
+            return none;
+        return item qua QueueLink
+    end;
+    Ref(QueueLink) function Dequeue;
+    begin
+        Ref(Link) item;
+        item :- members.first();
+        if item == none then
+            return none;
+        item.out();
+        return item qua QueueLink
+    end;
+    Procedure Clear;
+    begin
+        members.clear()
+    end
+end;

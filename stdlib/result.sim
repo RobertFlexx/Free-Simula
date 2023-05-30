@@ -1,0 +1,37 @@
+module Result;
+
+Class IntegerResult;
+begin
+    Private:
+    boolean successful;
+    integer stored_value;
+    string error_message;
+    Public:
+    Procedure SetSuccess(integer value);
+    begin
+        successful := true;
+        stored_value := value;
+        error_message := ""
+    end;
+    Procedure SetFailure(string message);
+    begin
+        successful := false;
+        stored_value := 0;
+        error_message := message
+    end;
+    boolean function IsSuccess;
+    begin
+        return successful
+    end;
+    integer function ValueOr(integer fallback);
+    begin
+        if successful then
+            return stored_value
+        else
+            return fallback
+    end;
+    string function ErrorMessage;
+    begin
+        return error_message
+    end;
+end;

@@ -1,0 +1,21 @@
+module ClassicText;
+
+integer function TextLength(text value);
+begin
+    return value.length
+end;
+
+text function MainFrame(text value);
+begin
+    return value.main
+end;
+
+boolean function TextEmpty(text value);
+begin
+    return value.length = 0
+end;
+
+boolean function TextEqual(text left, text right);
+begin
+    return left = right
+end;

@@ -1,0 +1,20 @@
+module ProcessSupport;
+
+Process Class CooperativeProcess;
+begin
+    Protected:
+    integer process_state;
+    Public:
+    integer function State;
+    begin
+        return process_state
+    end;
+    Procedure MarkRunnable;
+    begin
+        process_state := 1
+    end;
+    Procedure MarkBlocked;
+    begin
+        process_state := 2
+    end;
+end;

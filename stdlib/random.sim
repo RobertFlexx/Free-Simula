@@ -1,0 +1,41 @@
+module RandomNumbers;
+
+Class LinearCongruentialGenerator;
+begin
+    Private:
+    integer state_value;
+    Public:
+    Procedure Seed(integer seed_value);
+    begin
+        if seed_value < 0 then
+            seed_value := -seed_value;
+        state_value := seed_value mod 2147483647;
+        if state_value = 0 then
+            state_value := 1
+    end;
+    integer function Next;
+    begin
+        state_value := (state_value * 48271) mod 2147483647;
+        if state_value < 0 then
+            state_value := -state_value;
+        return state_value
+    end;
+    integer function NextBounded(integer upper_bound);
+    begin
+        if upper_bound <= 0 then
+            return 0;
+        return Next mod upper_bound
+    end;
+    integer function NextRange(integer lower_bound, integer upper_bound);
+    begin
+        integer width;
+        width := upper_bound - lower_bound;
+        if width <= 0 then
+            return lower_bound;
+        return lower_bound + NextBounded(width)
+    end;
+    boolean function NextBoolean;
+    begin
+        return (Next mod 2) = 0
+    end;
+end;

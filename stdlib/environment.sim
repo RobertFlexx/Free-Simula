@@ -1,0 +1,19 @@
+module Environment;
+
+Procedure WriteLine(string value);
+begin
+    outtext(value);
+    outimage
+end;
+
+Procedure WriteInteger(integer value);
+begin
+    outint(value)
+end;
+
+Procedure WriteIntegerLine(integer value);
+begin
+    outint(value);
+    outimage
+end;
+

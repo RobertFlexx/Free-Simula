@@ -1,0 +1,65 @@
+module QueueStatistics;
+
+Class QueueTally;
+begin
+    Private:
+    integer arrivals;
+    integer departures;
+    integer current_length;
+    integer maximum_length;
+    integer accumulated_length;
+    integer samples;
+    Public:
+    Procedure Reset;
+    begin
+        arrivals := 0;
+        departures := 0;
+        current_length := 0;
+        maximum_length := 0;
+        accumulated_length := 0;
+        samples := 0
+    end;
+    Procedure Arrive;
+    begin
+        arrivals := arrivals + 1;
+        current_length := current_length + 1;
+        if current_length > maximum_length then
+            maximum_length := current_length;
+        Sample
+    end;
+    Procedure Depart;
+    begin
+        if current_length > 0 then
+        begin
+            departures := departures + 1;
+            current_length := current_length - 1
+        end;
+        Sample
+    end;
+    Procedure Sample;
+    begin
+        accumulated_length := accumulated_length + current_length;
+        samples := samples + 1
+    end;
+    integer function Length;
+    begin
+        return current_length
+    end;
+    integer function MaximumLength;
+    begin
+        return maximum_length
+    end;
+    integer function MeanSampledLength;
+    begin
+        if samples = 0 then return 0;
+        return accumulated_length // samples
+    end;
+    integer function ArrivalCount;
+    begin
+        return arrivals
+    end;
+    integer function DepartureCount;
+    begin
+        return departures
+    end
+end;

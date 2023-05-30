@@ -1,0 +1,66 @@
+module Geometry;
+
+Class IntegerPoint;
+begin
+    Private:
+    integer x_value;
+    integer y_value;
+    Public:
+    Procedure Set(integer x, integer y);
+    begin
+        x_value := x;
+        y_value := y
+    end;
+    integer function X;
+    begin
+        return x_value
+    end;
+    integer function Y;
+    begin
+        return y_value
+    end;
+    Procedure Translate(integer delta_x, integer delta_y);
+    begin
+        x_value := x_value + delta_x;
+        y_value := y_value + delta_y
+    end;
+    integer function ManhattanLength;
+    begin
+        integer absolute_x;
+        integer absolute_y;
+        absolute_x := x_value;
+        absolute_y := y_value;
+        if absolute_x < 0 then absolute_x := -absolute_x;
+        if absolute_y < 0 then absolute_y := -absolute_y;
+        return absolute_x + absolute_y
+    end;
+end;
+
+Class IntegerRectangle;
+begin
+    Private:
+    integer left_value;
+    integer top_value;
+    integer width_value;
+    integer height_value;
+    Public:
+    Procedure Set(integer left, integer top, integer width, integer height);
+    begin
+        left_value := left;
+        top_value := top;
+        width_value := width;
+        height_value := height
+    end;
+    integer function Area;
+    begin
+        if (width_value <= 0) or (height_value <= 0) then
+            return 0;
+        return width_value * height_value
+    end;
+    boolean function Contains(integer x, integer y);
+    begin
+        return (x >= left_value) and (y >= top_value) and
+          (x < left_value + width_value) and
+          (y < top_value + height_value)
+    end;
+end;

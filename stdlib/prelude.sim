@@ -1,0 +1,23 @@
+module Prelude;
+
+Procedure PrintLine(string value);
+begin
+    outtext(value);
+    outimage
+end;
+
+Procedure PrintIntegerLine(integer value);
+begin
+    outint(value);
+    outimage
+end;
+
+integer function Identity(integer value);
+begin
+    return value
+end;
+
+boolean function IsZero(integer value);
+begin
+    return value = 0
+end;

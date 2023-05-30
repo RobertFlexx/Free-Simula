@@ -1,0 +1,63 @@
+module Statistics;
+
+Class IntegerTally;
+begin
+    Private:
+    integer observation_count;
+    integer observation_sum;
+    integer minimum_value;
+    integer maximum_value;
+    Public:
+    Procedure Reset;
+    begin
+        observation_count := 0;
+        observation_sum := 0;
+        minimum_value := 0;
+        maximum_value := 0
+    end;
+    Procedure Observe(integer value);
+    begin
+        if observation_count = 0 then
+        begin
+            minimum_value := value;
+            maximum_value := value
+        end
+        else
+        begin
+            if value < minimum_value then
+                minimum_value := value;
+            if value > maximum_value then
+                maximum_value := value
+        end;
+        observation_count := observation_count + 1;
+        observation_sum := observation_sum + value
+    end;
+    integer function Count;
+    begin
+        return observation_count
+    end;
+    integer function Sum;
+    begin
+        return observation_sum
+    end;
+    integer function Mean;
+    begin
+        if observation_count = 0 then
+            return 0;
+        return observation_sum // observation_count
+    end;
+    integer function Minimum;
+    begin
+        return minimum_value
+    end;
+    integer function Maximum;
+    begin
+        return maximum_value
+    end;
+    integer function Range;
+    begin
+        if observation_count = 0 then
+            return 0;
+        return maximum_value - minimum_value
+    end;
+end;

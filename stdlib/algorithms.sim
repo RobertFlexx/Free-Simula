@@ -1,0 +1,39 @@
+module Algorithms;
+
+integer function BinarySearch(array[0:1023] of integer values,
+  integer count, integer needle);
+begin
+    integer lower;
+    integer upper;
+    integer middle;
+    lower := 0;
+    upper := count - 1;
+    while lower <= upper do
+    begin
+        middle := lower + ((upper - lower) // 2);
+        if values[middle] = needle then
+            return middle
+        else if values[middle] < needle then
+            lower := middle + 1
+        else
+            upper := middle - 1
+    end;
+    return -1
+end;
+
+integer function IntegerPower(integer base, integer exponent);
+begin
+    integer result;
+    integer factor;
+    result := 1;
+    factor := base;
+    while exponent > 0 do
+    begin
+        if (exponent mod 2) = 1 then
+            result := result * factor;
+        exponent := exponent // 2;
+        if exponent > 0 then
+            factor := factor * factor
+    end;
+    return result
+end;

@@ -1,0 +1,67 @@
+module Histogram;
+
+Class IntegerHistogram;
+begin
+    Private:
+    array[0:63] of integer buckets;
+    integer bucket_count;
+    integer lower_value;
+    integer upper_value;
+    integer observation_count;
+    integer below_count;
+    integer above_count;
+    Public:
+    Procedure Initialize(integer lower, integer upper, integer count);
+    begin
+        integer index;
+        if count < 1 then count := 1;
+        if count > 64 then count := 64;
+        lower_value := lower;
+        upper_value := upper;
+        bucket_count := count;
+        observation_count := 0;
+        below_count := 0;
+        above_count := 0;
+        for index := 0 step 1 until 63 do buckets[index] := 0
+    end;
+    Procedure Observe(integer value);
+    begin
+        integer index;
+        integer width;
+        observation_count := observation_count + 1;
+        if value < lower_value then
+        begin
+            below_count := below_count + 1;
+            return
+        end;
+        if value > upper_value then
+        begin
+            above_count := above_count + 1;
+            return
+        end;
+        width := upper_value - lower_value + 1;
+        if width <= 0 then index := 0
+        else index := ((value - lower_value) * bucket_count) // width;
+        if index < 0 then index := 0;
+        if index >= bucket_count then index := bucket_count - 1;
+        buckets[index] := buckets[index] + 1
+    end;
+    integer function Bucket(integer index);
+    begin
+        if index < 0 then return 0;
+        if index >= bucket_count then return 0;
+        return buckets[index]
+    end;
+    integer function Count;
+    begin
+        return observation_count
+    end;
+    integer function Below;
+    begin
+        return below_count
+    end;
+    integer function Above;
+    begin
+        return above_count
+    end
+end;

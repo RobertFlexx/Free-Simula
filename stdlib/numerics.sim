@@ -1,0 +1,74 @@
+module Numerics;
+
+integer function Sign(integer value);
+begin
+    if value < 0 then
+        return -1
+    else if value > 0 then
+        return 1
+    else
+        return 0
+end;
+
+integer function Square(integer value);
+begin
+    return value * value
+end;
+
+integer function Cube(integer value);
+begin
+    return value * value * value
+end;
+
+integer function IntegerSquareRoot(integer value);
+begin
+    integer lower;
+    integer upper;
+    integer middle;
+    integer candidate;
+    if value <= 0 then
+        return 0;
+    lower := 1;
+    upper := value;
+    while lower <= upper do
+    begin
+        middle := lower + ((upper - lower) // 2);
+        candidate := value // middle;
+        if middle = candidate then
+            return middle
+        else if middle < candidate then
+            lower := middle + 1
+        else
+            upper := middle - 1
+    end;
+    return upper
+end;
+
+integer function Factorial(integer value);
+begin
+    integer result;
+    result := 1;
+    while value > 1 do
+    begin
+        result := result * value;
+        value := value - 1
+    end;
+    return result
+end;
+
+integer function Fibonacci(integer value);
+begin
+    integer previous;
+    integer current;
+    integer next_value;
+    previous := 0;
+    current := 1;
+    while value > 0 do
+    begin
+        next_value := previous + current;
+        previous := current;
+        current := next_value;
+        value := value - 1
+    end;
+    return previous
+end;

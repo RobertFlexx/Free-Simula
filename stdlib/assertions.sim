@@ -1,0 +1,21 @@
+module Assertions;
+
+Procedure Require(boolean condition);
+begin
+    assert(condition)
+end;
+
+Procedure RequireEqual(integer actual, integer expected);
+begin
+    assert(actual = expected)
+end;
+
+Procedure RequireNotEqual(integer actual, integer expected);
+begin
+    assert(actual <> expected)
+end;
+
+Procedure RequireNonnegative(integer value);
+begin
+    assert(value >= 0)
+end;

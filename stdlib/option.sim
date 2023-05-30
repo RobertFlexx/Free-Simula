@@ -1,0 +1,34 @@
+module Option;
+
+Class IntegerOption;
+begin
+    Private:
+    boolean has_value;
+    integer stored_value;
+    Public:
+    Procedure Clear;
+    begin
+        has_value := false;
+        stored_value := 0
+    end;
+    Procedure Set(integer value);
+    begin
+        stored_value := value;
+        has_value := true
+    end;
+    boolean function IsSome;
+    begin
+        return has_value
+    end;
+    boolean function IsNone;
+    begin
+        return not has_value
+    end;
+    integer function ValueOr(integer fallback);
+    begin
+        if has_value then
+            return stored_value
+        else
+            return fallback
+    end;
+end;

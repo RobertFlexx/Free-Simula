@@ -1,0 +1,9 @@
+program StandardLibraryMath;
+import Math;
+begin
+    integer divisor;
+    divisor := GreatestCommonDivisor(84, 30);
+    outint(divisor);
+    outimage;
+    exit(0)
+end;

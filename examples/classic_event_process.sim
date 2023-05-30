@@ -1,0 +1,28 @@
+Process Class EventProcess;
+Virtual: Procedure LifeCycle Is Procedure LifeCycle;;
+begin
+    Protected:
+    real scheduled_time;
+    Public:
+    Procedure LifeCycle;
+    begin
+        detach;
+        hold 1.0;
+        passivate
+    end;
+    real function ScheduledTime;
+    begin
+        return scheduled_time
+    end;
+end;
+
+program ClassicEventProcess;
+begin
+    Ref(EventProcess) first;
+    Ref(EventProcess) second;
+    first :- new EventProcess();
+    second :- new EventProcess();
+    activate first at 10.0 prior;
+    activate second after first;
+    reactivate first delay 5.0
+end;
