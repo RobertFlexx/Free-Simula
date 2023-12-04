@@ -1,0 +1,33 @@
+module StateMachine;
+
+Class IntegerStateMachine;
+begin
+    Private:
+    integer current_state;
+    integer previous_state;
+    integer transition_count;
+    Public:
+    Procedure Reset(integer initial_state);
+    begin
+        current_state := initial_state;
+        previous_state := initial_state;
+        transition_count := 0
+    end;
+    Procedure Transition(integer next_state);
+    begin
+        if next_state <> current_state then
+        begin
+            previous_state := current_state;
+            current_state := next_state;
+            transition_count := transition_count + 1
+        end
+    end;
+    integer function Current;
+    begin return current_state end;
+    integer function Previous;
+    begin return previous_state end;
+    integer function Transitions;
+    begin return transition_count end;
+    boolean function Is(integer state_value);
+    begin return current_state = state_value end;
+end;

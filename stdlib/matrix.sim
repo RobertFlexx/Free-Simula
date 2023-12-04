@@ -1,0 +1,73 @@
+module Matrix;
+
+Class IntegerMatrix16;
+begin
+    Private:
+    array[0:255] of integer cells;
+    integer row_count;
+    integer column_count;
+    integer function Offset(integer row, integer column);
+    begin
+        return row * column_count + column
+    end;
+    Public:
+    Procedure Resize(integer rows, integer columns);
+    begin
+        if rows < 0 then rows := 0;
+        if columns < 0 then columns := 0;
+        if rows > 16 then rows := 16;
+        if columns > 16 then columns := 16;
+        row_count := rows;
+        column_count := columns;
+        Clear()
+    end;
+    Procedure Clear;
+    begin
+        integer index;
+        for index := 0 step 1 until 255 do cells[index] := 0
+    end;
+    integer function Rows;
+    begin
+        return row_count
+    end;
+    integer function Columns;
+    begin
+        return column_count
+    end;
+    boolean function Valid(integer row, integer column);
+    begin
+        return (row >= 0) and (row < row_count) and
+            (column >= 0) and (column < column_count)
+    end;
+    integer function Get(integer row, integer column);
+    begin
+        if not Valid(row, column) then return 0;
+        return cells[Offset(row, column)]
+    end;
+    boolean function Put(integer row, integer column, integer value);
+    begin
+        if not Valid(row, column) then return false;
+        cells[Offset(row, column)] := value;
+        return true
+    end;
+    Procedure Fill(integer value);
+    begin
+        integer row;
+        integer column;
+        for row := 0 step 1 until row_count - 1 do
+            for column := 0 step 1 until column_count - 1 do
+                cells[Offset(row, column)] := value
+    end;
+    integer function Trace;
+    begin
+        integer index;
+        integer limit;
+        integer total;
+        limit := row_count;
+        if column_count < limit then limit := column_count;
+        total := 0;
+        for index := 0 step 1 until limit - 1 do
+            total := total + Get(index, index);
+        return total
+    end;
+end;

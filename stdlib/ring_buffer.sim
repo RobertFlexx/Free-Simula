@@ -1,0 +1,55 @@
+module RingBuffer;
+
+Class IntegerRingBuffer;
+begin
+    Private:
+    array[0:1023] of integer values;
+    integer read_index;
+    integer write_index;
+    integer value_count;
+    Public:
+    Procedure Clear;
+    begin
+        read_index := 0;
+        write_index := 0;
+        value_count := 0
+    end;
+    integer function Capacity;
+    begin
+        return 1024
+    end;
+    integer function Count;
+    begin
+        return value_count
+    end;
+    boolean function Empty;
+    begin
+        return value_count = 0
+    end;
+    boolean function Full;
+    begin
+        return value_count = 1024
+    end;
+    boolean function Write(integer value);
+    begin
+        if Full() then return false;
+        values[write_index] := value;
+        write_index := (write_index + 1) mod 1024;
+        value_count := value_count + 1;
+        return true
+    end;
+    integer function Read;
+    begin
+        integer value;
+        if Empty() then return 0;
+        value := values[read_index];
+        read_index := (read_index + 1) mod 1024;
+        value_count := value_count - 1;
+        return value
+    end;
+    integer function Peek;
+    begin
+        if Empty() then return 0;
+        return values[read_index]
+    end;
+end;

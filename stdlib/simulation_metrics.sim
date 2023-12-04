@@ -1,0 +1,54 @@
+module SimulationMetrics;
+
+Class SimulationCounter;
+begin
+    Private:
+    integer arrivals;
+    integer completions;
+    integer cancellations;
+    integer active_count;
+    integer maximum_active;
+    integer total_wait;
+    Public:
+    Procedure Reset;
+    begin
+        arrivals := 0;
+        completions := 0;
+        cancellations := 0;
+        active_count := 0;
+        maximum_active := 0;
+        total_wait := 0
+    end;
+    Procedure Arrived;
+    begin
+        arrivals := arrivals + 1;
+        active_count := active_count + 1;
+        if active_count > maximum_active then maximum_active := active_count
+    end;
+    Procedure Completed(integer wait_time);
+    begin
+        completions := completions + 1;
+        if active_count > 0 then active_count := active_count - 1;
+        if wait_time > 0 then total_wait := total_wait + wait_time
+    end;
+    Procedure Cancelled;
+    begin
+        cancellations := cancellations + 1;
+        if active_count > 0 then active_count := active_count - 1
+    end;
+    integer function Arrivals;
+    begin return arrivals end;
+    integer function Completions;
+    begin return completions end;
+    integer function Cancellations;
+    begin return cancellations end;
+    integer function Active;
+    begin return active_count end;
+    integer function PeakActive;
+    begin return maximum_active end;
+    integer function MeanWait;
+    begin
+        if completions = 0 then return 0;
+        return total_wait // completions
+    end;
+end;

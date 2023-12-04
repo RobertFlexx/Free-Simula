@@ -1,0 +1,36 @@
+module RandomDistributions;
+import RandomNumbers;
+
+Class IntegerDistributions;
+begin
+    Private:
+    Ref(LinearCongruentialGenerator) source;
+    Public:
+    Procedure Attach(Ref(LinearCongruentialGenerator) generator);
+    begin
+        source :- generator
+    end;
+    integer function Uniform(integer lower_bound, integer upper_bound);
+    begin
+        if source == none then return lower_bound;
+        return source.NextRange(lower_bound, upper_bound)
+    end;
+    integer function Bernoulli(integer successes, integer total);
+    begin
+        if (source == none) or (total <= 0) then return 0;
+        if successes <= 0 then return 0;
+        if successes >= total then return 1;
+        if source.NextBounded(total) < successes then return 1;
+        return 0
+    end;
+    integer function Dice(integer count, integer sides);
+    begin
+        integer index;
+        integer result;
+        if (source == none) or (count <= 0) or (sides <= 0) then return 0;
+        result := 0;
+        for index := 1 step 1 until count do
+            result := result + source.NextBounded(sides) + 1;
+        return result
+    end;
+end;

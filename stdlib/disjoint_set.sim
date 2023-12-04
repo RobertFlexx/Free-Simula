@@ -1,0 +1,68 @@
+module DisjointSet;
+
+Class IntegerDisjointSet;
+begin
+    Private:
+    array[0:1023] of integer parent;
+    array[0:1023] of integer rank_value;
+    integer element_count;
+    Public:
+    Procedure Initialize(integer count);
+    begin
+        integer index;
+        if count < 0 then count := 0;
+        if count > 1024 then count := 1024;
+        element_count := count;
+        for index := 0 step 1 until count - 1 do
+        begin
+            parent[index] := index;
+            rank_value[index] := 0
+        end
+    end;
+    integer function Count;
+    begin
+        return element_count
+    end;
+    integer function Find(integer value);
+    begin
+        integer root;
+        integer next;
+        if (value < 0) or (value >= element_count) then return -1;
+        root := value;
+        while parent[root] <> root do root := parent[root];
+        while parent[value] <> value do
+        begin
+            next := parent[value];
+            parent[value] := root;
+            value := next
+        end;
+        return root
+    end;
+    boolean function Unite(integer left, integer right);
+    begin
+        integer left_root;
+        integer right_root;
+        left_root := Find(left);
+        right_root := Find(right);
+        if (left_root < 0) or (right_root < 0) then return false;
+        if left_root = right_root then return false;
+        if rank_value[left_root] < rank_value[right_root] then
+            parent[left_root] := right_root
+        else if rank_value[left_root] > rank_value[right_root] then
+            parent[right_root] := left_root
+        else
+        begin
+            parent[right_root] := left_root;
+            rank_value[left_root] := rank_value[left_root] + 1
+        end;
+        return true
+    end;
+    boolean function Connected(integer left, integer right);
+    begin
+        integer left_root;
+        integer right_root;
+        left_root := Find(left);
+        right_root := Find(right);
+        return (left_root >= 0) and (left_root = right_root)
+    end;
+end;

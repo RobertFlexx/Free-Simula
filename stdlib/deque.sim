@@ -1,0 +1,73 @@
+module Deque;
+
+Class IntegerDeque;
+begin
+    Private:
+    array[0:511] of integer items;
+    integer first_index;
+    integer item_count;
+    Public:
+    Procedure Clear;
+    begin
+        first_index := 0;
+        item_count := 0
+    end;
+    boolean function Empty;
+    begin
+        return item_count = 0
+    end;
+    boolean function Full;
+    begin
+        return item_count = 512
+    end;
+    integer function Count;
+    begin
+        return item_count
+    end;
+    boolean function PushBack(integer value);
+    begin
+        integer index;
+        if Full() then return false;
+        index := (first_index + item_count) mod 512;
+        items[index] := value;
+        item_count := item_count + 1;
+        return true
+    end;
+    boolean function PushFront(integer value);
+    begin
+        if Full() then return false;
+        first_index := (first_index + 511) mod 512;
+        items[first_index] := value;
+        item_count := item_count + 1;
+        return true
+    end;
+    integer function Front;
+    begin
+        if Empty() then return 0;
+        return items[first_index]
+    end;
+    integer function Back;
+    begin
+        integer index;
+        if Empty() then return 0;
+        index := (first_index + item_count - 1) mod 512;
+        return items[index]
+    end;
+    integer function PopFront;
+    begin
+        integer value;
+        if Empty() then return 0;
+        value := items[first_index];
+        first_index := (first_index + 1) mod 512;
+        item_count := item_count - 1;
+        return value
+    end;
+    integer function PopBack;
+    begin
+        integer index;
+        if Empty() then return 0;
+        index := (first_index + item_count - 1) mod 512;
+        item_count := item_count - 1;
+        return items[index]
+    end;
+end;

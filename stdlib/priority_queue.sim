@@ -1,0 +1,88 @@
+module PriorityQueue;
+
+Class IntegerPriorityQueue;
+begin
+    Private:
+    array[0:511] of integer priorities;
+    array[0:511] of integer values;
+    integer item_count;
+    Procedure Swap(integer left, integer right);
+    begin
+        integer temporary;
+        temporary := priorities[left];
+        priorities[left] := priorities[right];
+        priorities[right] := temporary;
+        temporary := values[left];
+        values[left] := values[right];
+        values[right] := temporary
+    end;
+    Public:
+    Procedure Clear;
+    begin
+        item_count := 0
+    end;
+    boolean function Empty;
+    begin
+        return item_count = 0
+    end;
+    integer function Count;
+    begin
+        return item_count
+    end;
+    boolean function Insert(integer priority, integer value);
+    begin
+        integer index;
+        integer parent;
+        if item_count = 512 then return false;
+        index := item_count;
+        item_count := item_count + 1;
+        priorities[index] := priority;
+        values[index] := value;
+        while index > 0 do
+        begin
+            parent := (index - 1) // 2;
+            if priorities[parent] <= priorities[index] then return true;
+            Swap(parent, index);
+            index := parent
+        end;
+        return true
+    end;
+    integer function MinimumPriority;
+    begin
+        if Empty() then return 0;
+        return priorities[0]
+    end;
+    integer function MinimumValue;
+    begin
+        if Empty() then return 0;
+        return values[0]
+    end;
+    integer function RemoveMinimum;
+    begin
+        integer result;
+        integer index;
+        integer left;
+        integer right;
+        integer smallest;
+        if Empty() then return 0;
+        result := values[0];
+        item_count := item_count - 1;
+        if item_count = 0 then return result;
+        priorities[0] := priorities[item_count];
+        values[0] := values[item_count];
+        index := 0;
+        while true do
+        begin
+            left := index * 2 + 1;
+            right := left + 1;
+            smallest := index;
+            if (left < item_count) and (priorities[left] < priorities[smallest]) then
+                smallest := left;
+            if (right < item_count) and (priorities[right] < priorities[smallest]) then
+                smallest := right;
+            if smallest = index then return result;
+            Swap(index, smallest);
+            index := smallest
+        end
+    end;
+end;
