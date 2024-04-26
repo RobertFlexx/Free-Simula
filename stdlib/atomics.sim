@@ -1,0 +1,68 @@
+module Atomics;
+
+integer function AtomicLoad(atomic(integer) cell);
+begin
+    return atomic_load(cell)
+end;
+
+Procedure AtomicStore(atomic(integer) cell, integer new_value);
+begin
+    atomic_store(cell, new_value)
+end;
+
+integer function AtomicExchange(atomic(integer) cell, integer new_value);
+begin
+    return atomic_exchange(cell, new_value)
+end;
+
+boolean function AtomicCompareExchange(atomic(integer) cell, integer expected, integer desired);
+begin
+    return atomic_compare_exchange(cell, expected, desired)
+end;
+
+integer function AtomicFetchAdd(atomic(integer) cell, integer amount);
+begin
+    return atomic_fetch_add(cell, amount)
+end;
+
+integer function AtomicFetchSub(atomic(integer) cell, integer amount);
+begin
+    return atomic_fetch_sub(cell, amount)
+end;
+
+Class AtomicCounter;
+begin
+    Private:
+    atomic(integer) cell;
+
+    Public:
+    Procedure Reset;
+    begin
+        atomic_store(cell, 0)
+    end;
+
+    Procedure Store(integer new_value);
+    begin
+        atomic_store(cell, new_value)
+    end;
+
+    integer function Load;
+    begin
+        return atomic_load(cell)
+    end;
+
+    integer function Increment;
+    begin
+        return atomic_fetch_add(cell, 1) + 1
+    end;
+
+    integer function Decrement;
+    begin
+        return atomic_fetch_sub(cell, 1) - 1
+    end;
+
+    integer function Add(integer amount);
+    begin
+        return atomic_fetch_add(cell, amount) + amount
+    end;
+end;

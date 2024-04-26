@@ -1,0 +1,68 @@
+module StringAlgorithms;
+
+boolean function StartsWith(string source, string prefix);
+begin
+    integer index;
+    if prefix.length > source.length then
+        return false;
+    index := 0;
+    while index < prefix.length do
+    begin
+        if source.byte(index) <> prefix.byte(index) then
+            return false;
+        index := index + 1
+    end;
+    return true
+end;
+
+boolean function EndsWith(string source, string suffix);
+begin
+    integer index, offset;
+    if suffix.length > source.length then
+        return false;
+    offset := source.length - suffix.length;
+    index := 0;
+    while index < suffix.length do
+    begin
+        if source.byte(offset + index) <> suffix.byte(index) then
+            return false;
+        index := index + 1
+    end;
+    return true
+end;
+
+integer function IndexOf(string source, string needle);
+begin
+    integer outer_index, inner_index, limit;
+    if needle.length = 0 then
+        return 0;
+    if needle.length > source.length then
+        return -1;
+    limit := source.length - needle.length;
+    outer_index := 0;
+    while outer_index <= limit do
+    begin
+        inner_index := 0;
+        while inner_index < needle.length do
+        begin
+            if source.byte(outer_index + inner_index) <> needle.byte(inner_index) then
+                inner_index := needle.length + 1
+            else
+                inner_index := inner_index + 1
+        end;
+        if inner_index = needle.length then
+            return outer_index;
+        outer_index := outer_index + 1
+    end;
+    return -1
+end;
+
+boolean function Contains(string source, string needle);
+begin
+    return IndexOf(source, needle) >= 0
+end;
+
+string function Slice(string source, integer first, integer count);
+begin
+    return source.slice(first, count)
+end;

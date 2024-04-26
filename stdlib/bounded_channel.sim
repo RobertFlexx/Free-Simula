@@ -1,0 +1,47 @@
+module BoundedChannel;
+
+Class IntegerMailbox;
+begin
+    Private:
+    channel(integer) slot;
+    Public:
+    Procedure Send(integer value);
+    begin
+        send(slot, value)
+    end;
+    integer function Receive;
+    begin
+        return receive(slot)
+    end
+end;
+
+Class LockedInteger;
+begin
+    Private:
+    mutex guard;
+    integer stored_value;
+    Public:
+    Procedure Store(integer value);
+    begin
+        lock guard;
+        stored_value := value;
+        unlock guard
+    end;
+    integer function Load;
+    begin
+        integer result_value;
+        lock guard;
+        result_value := stored_value;
+        unlock guard;
+        return result_value
+    end;
+    integer function Exchange(integer value);
+    begin
+        integer old_value;
+        lock guard;
+        old_value := stored_value;
+        stored_value := value;
+        unlock guard;
+        return old_value
+    end
+end;

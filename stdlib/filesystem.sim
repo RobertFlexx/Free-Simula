@@ -1,0 +1,51 @@
+module Filesystem;
+
+integer function ArgumentCount;
+begin
+    return os_argc()
+end;
+
+string function Argument(integer index);
+begin
+    return os_argv(index)
+end;
+
+integer function PathType(string path);
+begin
+    return os_path_type(path)
+end;
+
+integer function PathSize(string path);
+begin
+    return os_path_size(path)
+end;
+
+string function JoinPath(string left, string right);
+begin
+    return os_path_join(left, right)
+end;
+
+string function BaseName(string path);
+begin
+    return os_path_basename(path)
+end;
+
+boolean function PathExists(string path);
+begin
+    return os_path_type(path) <> 0
+end;
+
+boolean function IsRegularFile(string path);
+begin
+    return os_path_type(path) = 1
+end;
+
+boolean function IsDirectory(string path);
+begin
+    return os_path_type(path) = 2
+end;
+
+boolean function IsSymbolicLink(string path);
+begin
+    return os_path_type(path) = 3
+end;

@@ -1,0 +1,95 @@
+module ResourceFacility;
+
+Class Facility;
+begin
+    Private:
+    integer capacity_value;
+    integer in_use_value;
+    integer request_count;
+    integer rejected_count;
+    Public:
+    Procedure Initialize(integer capacity);
+    begin
+        if capacity < 0 then capacity := 0;
+        capacity_value := capacity;
+        in_use_value := 0;
+        request_count := 0;
+        rejected_count := 0
+    end;
+    boolean function Request(integer amount);
+    begin
+        request_count := request_count + 1;
+        if amount <= 0 then return true;
+        if in_use_value + amount > capacity_value then
+        begin
+            rejected_count := rejected_count + 1;
+            return false
+        end;
+        in_use_value := in_use_value + amount;
+        return true
+    end;
+    Procedure Release(integer amount);
+    begin
+        if amount <= 0 then return;
+        in_use_value := in_use_value - amount;
+        if in_use_value < 0 then in_use_value := 0
+    end;
+    integer function Capacity;
+    begin
+        return capacity_value
+    end;
+    integer function InUse;
+    begin
+        return in_use_value
+    end;
+    integer function Available;
+    begin
+        return capacity_value - in_use_value
+    end;
+    integer function Requests;
+    begin
+        return request_count
+    end;
+    integer function Rejections;
+    begin
+        return rejected_count
+    end
+end;
+
+Class Store;
+begin
+    Private:
+    integer quantity_value;
+    integer maximum_value;
+    Public:
+    Procedure Initialize(integer initial_quantity, integer maximum_quantity);
+    begin
+        if maximum_quantity < 0 then maximum_quantity := 0;
+        maximum_value := maximum_quantity;
+        quantity_value := initial_quantity;
+        if quantity_value < 0 then quantity_value := 0;
+        if quantity_value > maximum_value then quantity_value := maximum_value
+    end;
+    boolean function Take(integer amount);
+    begin
+        if amount <= 0 then return true;
+        if amount > quantity_value then return false;
+        quantity_value := quantity_value - amount;
+        return true
+    end;
+    boolean function Put(integer amount);
+    begin
+        if amount <= 0 then return true;
+        if quantity_value + amount > maximum_value then return false;
+        quantity_value := quantity_value + amount;
+        return true
+    end;
+    integer function Quantity;
+    begin
+        return quantity_value
+    end;
+    integer function FreeSpace;
+    begin
+        return maximum_value - quantity_value
+    end
+end;

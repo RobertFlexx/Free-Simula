@@ -1,0 +1,56 @@
+module Time;
+
+integer function MonotonicNanoseconds;
+begin
+    return monotonic_ns()
+end;
+
+integer function CurrentThreadId;
+begin
+    return thread_id()
+end;
+
+Procedure SleepNanoseconds(integer duration);
+begin
+    if duration > 0 then
+        sleep_ns(duration)
+end;
+
+Procedure SleepMicroseconds(integer duration);
+begin
+    if duration > 0 then
+        sleep_ns(duration * 1000)
+end;
+
+Procedure SleepMilliseconds(integer duration);
+begin
+    if duration > 0 then
+        sleep_ns(duration * 1000000)
+end;
+
+Class Stopwatch;
+begin
+    Private:
+    integer started_at;
+
+    Public:
+    Procedure Reset;
+    begin
+        started_at := monotonic_ns()
+    end;
+
+    integer function ElapsedNanoseconds;
+    begin
+        return monotonic_ns() - started_at
+    end;
+
+    integer function ElapsedMicroseconds;
+    begin
+        return (monotonic_ns() - started_at) // 1000
+    end;
+
+    integer function ElapsedMilliseconds;
+    begin
+        return (monotonic_ns() - started_at) // 1000000
+    end;
+end;

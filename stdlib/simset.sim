@@ -1,0 +1,46 @@
+module SimsetSupport;
+
+boolean function SetEmpty(Ref(Head) set);
+begin
+    return set.empty()
+end;
+
+integer function SetCardinal(Ref(Head) set);
+begin
+    return set.cardinal()
+end;
+
+Ref(Link) function SetFirst(Ref(Head) set);
+begin
+    return set.first()
+end;
+
+Ref(Link) function SetLast(Ref(Head) set);
+begin
+    return set.last()
+end;
+
+Procedure InsertLast(Ref(Head) set, Ref(Link) item);
+begin
+    item.into(set)
+end;
+
+Procedure InsertAfter(Ref(Link) position, Ref(Link) item);
+begin
+    item.follow(position)
+end;
+
+Procedure InsertBefore(Ref(Link) position, Ref(Link) item);
+begin
+    item.precede(position)
+end;
+
+Procedure Remove(Ref(Link) item);
+begin
+    item.out()
+end;
+
+Procedure ClearSet(Ref(Head) set);
+begin
+    set.clear()
+end;

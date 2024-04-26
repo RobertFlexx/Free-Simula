@@ -1,0 +1,42 @@
+module Concurrency;
+
+Task Class Runnable;
+Virtual: Procedure Run Is Procedure Run;;
+begin
+    Private:
+    boolean cancellationRequested;
+    Protected:
+    integer taskState;
+    Public:
+    Procedure Run;
+    begin
+    end;
+    Procedure RequestCancellation;
+    begin
+        cancellationRequested := true;
+        taskState := 5
+    end;
+    boolean function IsCancellationRequested;
+    begin
+        return cancellationRequested
+    end;
+    integer function State;
+    begin
+        return taskState
+    end;
+end;
+
+Procedure YieldNow;
+begin
+    yield
+end;
+
+Procedure SendInteger(channel(integer) destination, integer value);
+begin
+    send(destination, value)
+end;
+
+integer function ReceiveInteger(channel(integer) source);
+begin
+    return receive(source)
+end;

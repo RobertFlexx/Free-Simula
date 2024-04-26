@@ -1,0 +1,41 @@
+module Futures;
+
+integer function FutureRunningState;
+begin
+    return 0
+end;
+
+integer function FutureCompletedState;
+begin
+    return 1
+end;
+
+integer function FutureCancelledState;
+begin
+    return 2
+end;
+
+integer function FuturePanickedState;
+begin
+    return 3
+end;
+
+boolean function IntegerFutureReady(future(integer) work);
+begin
+    return future_ready(work)
+end;
+
+boolean function IntegerFutureCancellationRequested(future(integer) work);
+begin
+    return future_cancel_requested(work)
+end;
+
+integer function IntegerFutureState(future(integer) work);
+begin
+    return future_state(work)
+end;
+
+integer function IntegerFutureThreadId(future(integer) work);
+begin
+    return future_thread_id(work)
+end;

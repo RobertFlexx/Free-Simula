@@ -1,0 +1,28 @@
+module TextBuilder;
+
+Class StringBuilder;
+begin
+    Private:
+    string content;
+    Public:
+    Procedure Clear;
+    begin
+        content := ""
+    end;
+    Procedure Append(string value);
+    begin
+        content := content + value
+    end;
+    Procedure AppendLine(string value);
+    begin
+        content := content + value + "\n"
+    end;
+    boolean function Empty;
+    begin
+        return content = ""
+    end;
+    string function ToString;
+    begin
+        return content
+    end;
+end;

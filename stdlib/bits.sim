@@ -1,0 +1,48 @@
+module Bits;
+
+boolean function HasBit(integer bits, integer index);
+begin
+    if index < 0 then
+        return false;
+    if index >= 63 then
+        return false;
+    return (bits and (1 shl index)) <> 0
+end;
+
+integer function SetBit(integer bits, integer index);
+begin
+    if index < 0 then
+        return bits;
+    if index >= 63 then
+        return bits;
+    return bits or (1 shl index)
+end;
+
+integer function ToggleBit(integer bits, integer index);
+begin
+    if index < 0 then
+        return bits;
+    if index >= 63 then
+        return bits;
+    return bits xor (1 shl index)
+end;
+
+integer function ClearBit(integer bits, integer index);
+begin
+    integer mask;
+    if index < 0 then
+        return bits;
+    if index >= 63 then
+        return bits;
+    mask := 1 shl index;
+    if (bits and mask) <> 0 then
+        return bits xor mask;
+    return bits
+end;
+
+boolean function IsPowerOfTwo(integer bits);
+begin
+    if bits <= 0 then
+        return false;
+    return (bits and (bits - 1)) = 0
+end;

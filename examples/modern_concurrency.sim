@@ -1,0 +1,31 @@
+Task Class Worker;
+begin
+    Public:
+    integer value;
+    integer function Run;
+    begin
+        yield;
+        value := value + 1;
+        return value
+    end;
+end;
+
+program ModernConcurrency;
+begin
+    var mailbox: channel(integer);
+    var guard: mutex;
+    var worker: Ref(Worker);
+    var work: future(integer);
+    worker :- new Worker();
+    lock guard;
+    send(mailbox, 42);
+    unlock guard;
+    work :- spawn worker.Run();
+    parallel begin
+        yield
+    end;
+    critical begin
+        worker.value := receive(mailbox)
+    end;
+    worker.value := await work
+end;

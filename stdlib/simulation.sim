@@ -1,0 +1,31 @@
+module Simulation;
+
+Class SimulationEntity;
+begin
+    Protected:
+    integer simulation_time;
+    Public:
+    integer function Time;
+    begin
+        return simulation_time
+    end;
+    Procedure SetTime(integer value);
+    begin
+        simulation_time := value
+    end;
+end;
+
+SimulationEntity Class ScheduledEntity;
+begin
+    Private:
+    integer priority;
+    Public:
+    integer function Priority;
+    begin
+        return priority
+    end;
+    Procedure SetPriority(integer value);
+    begin
+        priority := value
+    end;
+end;
