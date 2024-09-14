@@ -1,0 +1,14 @@
+program HybridPascal;
+begin
+    var counter: integer := 0;
+    var total: long integer := 0;
+    repeat
+        counter := counter + 1;
+        total := total + counter
+    until counter = 10;
+    case total of
+        55: begin outtext("Simula structure with Pascal declarations") end
+    end;
+    outimage;
+    exit(0)
+end;
