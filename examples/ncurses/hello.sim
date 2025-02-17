@@ -1,0 +1,13 @@
+program NcursesHello;
+import Ncurses;
+
+begin
+    c_ptr(NCWindow) screen;
+    screen := initscr();
+    cbreak();
+    noecho();
+    mvaddstr(c_int(1), c_int(2), "Free Simula + ncurses. press a key.");
+    refresh();
+    getch();
+    endwin()
+end.

@@ -1,0 +1,19 @@
+program RaylibHello;
+import Raylib;
+
+begin
+    SetConfigFlags(c_uint(FLAG_WINDOW_RESIZABLE));
+    InitWindow(c_int(960), c_int(540), "Free Simula + raylib");
+    SetTargetFPS(c_int(60));
+
+    while WindowShouldClose() = c_bool(0) do
+    begin
+        BeginDrawing();
+        ClearBackground(RayWhite());
+        DrawText("hello from Free Simula", c_int(32), c_int(32), c_int(28), Black());
+        DrawCircleV(Vec2(real(GetMouseX()), real(GetMouseY())), c_float(12.0), Rgba(80, 120, 255, 255));
+        EndDrawing()
+    end;
+
+    CloseWindow()
+end.

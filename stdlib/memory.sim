@@ -1,0 +1,31 @@
+module Memory;
+
+integer function CollectGarbage;
+begin
+    return gc_collect()
+end;
+
+integer function LiveHeapBytes;
+begin
+    return gc_live_bytes()
+end;
+
+integer function ReclaimedHeapBytes;
+begin
+    return gc_reclaimed_bytes()
+end;
+
+integer function GarbageCollectionCount;
+begin
+    return gc_collection_count()
+end;
+
+boolean function PinManagedPointer(c_ptr(c_void) pointer);
+begin
+    return gc_pin(pointer)
+end;
+
+boolean function UnpinManagedPointer(c_ptr(c_void) pointer);
+begin
+    return gc_unpin(pointer)
+end;

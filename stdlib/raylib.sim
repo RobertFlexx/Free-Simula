@@ -1,0 +1,552 @@
+module Raylib;
+
+const integer RAYLIB_VERSION_MAJOR = 6;
+const integer RAYLIB_VERSION_MINOR = 0;
+const integer RAYLIB_VERSION_PATCH = 0;
+
+const integer FLAG_VSYNC_HINT = 64;
+const integer FLAG_FULLSCREEN_MODE = 2;
+const integer FLAG_WINDOW_RESIZABLE = 4;
+const integer FLAG_WINDOW_UNDECORATED = 8;
+const integer FLAG_WINDOW_HIDDEN = 128;
+const integer FLAG_WINDOW_MINIMIZED = 512;
+const integer FLAG_WINDOW_MAXIMIZED = 1024;
+const integer FLAG_WINDOW_UNFOCUSED = 2048;
+const integer FLAG_WINDOW_TOPMOST = 4096;
+const integer FLAG_WINDOW_ALWAYS_RUN = 256;
+const integer FLAG_WINDOW_TRANSPARENT = 16;
+const integer FLAG_WINDOW_HIGHDPI = 8192;
+const integer FLAG_WINDOW_MOUSE_PASSTHROUGH = 16384;
+const integer FLAG_BORDERLESS_WINDOWED_MODE = 32768;
+const integer FLAG_MSAA_4X_HINT = 32;
+const integer FLAG_INTERLACED_HINT = 65536;
+
+const integer LOG_ALL = 0;
+const integer LOG_TRACE = 1;
+const integer LOG_DEBUG = 2;
+const integer LOG_INFO = 3;
+const integer LOG_WARNING = 4;
+const integer LOG_ERROR = 5;
+const integer LOG_FATAL = 6;
+const integer LOG_NONE = 7;
+
+const integer KEY_NULL = 0;
+const integer KEY_SPACE = 32;
+const integer KEY_APOSTROPHE = 39;
+const integer KEY_COMMA = 44;
+const integer KEY_MINUS = 45;
+const integer KEY_PERIOD = 46;
+const integer KEY_SLASH = 47;
+const integer KEY_ZERO = 48;
+const integer KEY_ONE = 49;
+const integer KEY_TWO = 50;
+const integer KEY_THREE = 51;
+const integer KEY_FOUR = 52;
+const integer KEY_FIVE = 53;
+const integer KEY_SIX = 54;
+const integer KEY_SEVEN = 55;
+const integer KEY_EIGHT = 56;
+const integer KEY_NINE = 57;
+const integer KEY_SEMICOLON = 59;
+const integer KEY_EQUAL = 61;
+const integer KEY_A = 65;
+const integer KEY_B = 66;
+const integer KEY_C = 67;
+const integer KEY_D = 68;
+const integer KEY_E = 69;
+const integer KEY_F = 70;
+const integer KEY_G = 71;
+const integer KEY_H = 72;
+const integer KEY_I = 73;
+const integer KEY_J = 74;
+const integer KEY_K = 75;
+const integer KEY_L = 76;
+const integer KEY_M = 77;
+const integer KEY_N = 78;
+const integer KEY_O = 79;
+const integer KEY_P = 80;
+const integer KEY_Q = 81;
+const integer KEY_R = 82;
+const integer KEY_S = 83;
+const integer KEY_T = 84;
+const integer KEY_U = 85;
+const integer KEY_V = 86;
+const integer KEY_W = 87;
+const integer KEY_X = 88;
+const integer KEY_Y = 89;
+const integer KEY_Z = 90;
+const integer KEY_ESCAPE = 256;
+const integer KEY_ENTER = 257;
+const integer KEY_TAB = 258;
+const integer KEY_BACKSPACE = 259;
+const integer KEY_INSERT = 260;
+const integer KEY_DELETE = 261;
+const integer KEY_RIGHT = 262;
+const integer KEY_LEFT = 263;
+const integer KEY_DOWN = 264;
+const integer KEY_UP = 265;
+const integer KEY_PAGE_UP = 266;
+const integer KEY_PAGE_DOWN = 267;
+const integer KEY_HOME = 268;
+const integer KEY_END = 269;
+const integer KEY_F1 = 290;
+const integer KEY_F2 = 291;
+const integer KEY_F3 = 292;
+const integer KEY_F4 = 293;
+const integer KEY_F5 = 294;
+const integer KEY_F6 = 295;
+const integer KEY_F7 = 296;
+const integer KEY_F8 = 297;
+const integer KEY_F9 = 298;
+const integer KEY_F10 = 299;
+const integer KEY_F11 = 300;
+const integer KEY_F12 = 301;
+const integer KEY_LEFT_SHIFT = 340;
+const integer KEY_LEFT_CONTROL = 341;
+const integer KEY_LEFT_ALT = 342;
+const integer KEY_RIGHT_SHIFT = 344;
+const integer KEY_RIGHT_CONTROL = 345;
+const integer KEY_RIGHT_ALT = 346;
+
+const integer MOUSE_BUTTON_LEFT = 0;
+const integer MOUSE_BUTTON_RIGHT = 1;
+const integer MOUSE_BUTTON_MIDDLE = 2;
+const integer MOUSE_BUTTON_SIDE = 3;
+const integer MOUSE_BUTTON_EXTRA = 4;
+const integer MOUSE_BUTTON_FORWARD = 5;
+const integer MOUSE_BUTTON_BACK = 6;
+
+const integer CAMERA_CUSTOM = 0;
+const integer CAMERA_FREE = 1;
+const integer CAMERA_ORBITAL = 2;
+const integer CAMERA_FIRST_PERSON = 3;
+const integer CAMERA_THIRD_PERSON = 4;
+const integer CAMERA_PERSPECTIVE = 0;
+const integer CAMERA_ORTHOGRAPHIC = 1;
+
+foreign c record Vector2 begin
+    x: c_float;
+    y: c_float;
+end;
+
+foreign c record Vector3 begin
+    x: c_float;
+    y: c_float;
+    z: c_float;
+end;
+
+foreign c record Vector4 begin
+    x: c_float;
+    y: c_float;
+    z: c_float;
+    w: c_float;
+end;
+
+foreign c record Matrix begin
+    m0: c_float; m4: c_float; m8: c_float; m12: c_float;
+    m1: c_float; m5: c_float; m9: c_float; m13: c_float;
+    m2: c_float; m6: c_float; m10: c_float; m14: c_float;
+    m3: c_float; m7: c_float; m11: c_float; m15: c_float;
+end;
+
+foreign c record Color begin
+    r: c_uchar;
+    g: c_uchar;
+    b: c_uchar;
+    a: c_uchar;
+end;
+
+foreign c record Rectangle begin
+    x: c_float;
+    y: c_float;
+    width: c_float;
+    height: c_float;
+end;
+
+foreign c record Image begin
+    data: c_ptr(c_void);
+    width: c_int;
+    height: c_int;
+    mipmaps: c_int;
+    format: c_int;
+end;
+
+foreign c record Texture2D begin
+    id: c_uint;
+    width: c_int;
+    height: c_int;
+    mipmaps: c_int;
+    format: c_int;
+end;
+
+foreign c record RenderTexture2D begin
+    id: c_uint;
+    texture: Texture2D;
+    depth: Texture2D;
+end;
+
+foreign c record GlyphInfo begin
+    value: c_int;
+    offsetX: c_int;
+    offsetY: c_int;
+    advanceX: c_int;
+    image: Image;
+end;
+
+foreign c record Font begin
+    baseSize: c_int;
+    glyphCount: c_int;
+    glyphPadding: c_int;
+    texture: Texture2D;
+    recs: c_ptr(Rectangle);
+    glyphs: c_ptr(GlyphInfo);
+end;
+
+foreign c record Camera2D begin
+    offset: Vector2;
+    target: Vector2;
+    rotation: c_float;
+    zoom: c_float;
+end;
+
+foreign c record Camera3D begin
+    position: Vector3;
+    target: Vector3;
+    up: Vector3;
+    fovy: c_float;
+    projection: c_int;
+end;
+
+foreign c record Shader begin
+    id: c_uint;
+    locs: c_ptr(c_int);
+end;
+
+foreign c record Ray begin
+    position: Vector3;
+    direction: Vector3;
+end;
+
+foreign c record RayCollision begin
+    hit: c_bool;
+    distance: c_float;
+    point: Vector3;
+    normal: Vector3;
+end;
+
+foreign c record BoundingBox begin
+    minimum: Vector3;
+    maximum: Vector3;
+end;
+
+foreign c record Wave begin
+    frameCount: c_uint;
+    sampleRate: c_uint;
+    sampleSize: c_uint;
+    channels: c_uint;
+    data: c_ptr(c_void);
+end;
+
+foreign c opaque record RayAudioBuffer;
+foreign c opaque record RayAudioProcessor;
+
+foreign c record AudioStream begin
+    buffer: c_ptr(RayAudioBuffer);
+    processor: c_ptr(RayAudioProcessor);
+    sampleRate: c_uint;
+    sampleSize: c_uint;
+    channels: c_uint;
+end;
+
+foreign c record Sound begin
+    stream: AudioStream;
+    frameCount: c_uint;
+end;
+
+foreign c record Music begin
+    stream: AudioStream;
+    frameCount: c_uint;
+    looping: c_bool;
+    ctxType: c_int;
+    ctxData: c_ptr(c_void);
+end;
+
+foreign c from "libraylib.so.600" begin
+    procedure InitWindow(width: c_int, height: c_int, title: c_string);
+    procedure CloseWindow();
+    function WindowShouldClose(): c_bool;
+    function IsWindowReady(): c_bool;
+    function IsWindowFullscreen(): c_bool;
+    function IsWindowHidden(): c_bool;
+    function IsWindowMinimized(): c_bool;
+    function IsWindowMaximized(): c_bool;
+    function IsWindowFocused(): c_bool;
+    function IsWindowResized(): c_bool;
+    function IsWindowState(flag: c_uint): c_bool;
+    procedure SetWindowState(flags: c_uint);
+    procedure ClearWindowState(flags: c_uint);
+    procedure ToggleFullscreen();
+    procedure ToggleBorderlessWindowed();
+    procedure MaximizeWindow();
+    procedure MinimizeWindow();
+    procedure RestoreWindow();
+    procedure SetWindowTitle(title: c_string);
+    procedure SetWindowPosition(x: c_int, y: c_int);
+    procedure SetWindowMonitor(monitor: c_int);
+    procedure SetWindowMinSize(width: c_int, height: c_int);
+    procedure SetWindowMaxSize(width: c_int, height: c_int);
+    procedure SetWindowSize(width: c_int, height: c_int);
+    procedure SetWindowOpacity(opacity: c_float);
+    procedure SetWindowFocused();
+    function GetWindowHandle(): c_ptr(c_void);
+    function GetScreenWidth(): c_int;
+    function GetScreenHeight(): c_int;
+    function GetRenderWidth(): c_int;
+    function GetRenderHeight(): c_int;
+    function GetMonitorCount(): c_int;
+    function GetCurrentMonitor(): c_int;
+    function GetMonitorPosition(monitor: c_int): Vector2;
+    function GetMonitorWidth(monitor: c_int): c_int;
+    function GetMonitorHeight(monitor: c_int): c_int;
+    function GetMonitorRefreshRate(monitor: c_int): c_int;
+    function GetWindowPosition(): Vector2;
+    function GetWindowScaleDPI(): Vector2;
+    function GetMonitorName(monitor: c_int): c_string;
+    procedure SetClipboardText(message: c_string);
+    function GetClipboardText(): c_string;
+    procedure EnableEventWaiting();
+    procedure DisableEventWaiting();
+
+    procedure ShowCursor();
+    procedure HideCursor();
+    function IsCursorHidden(): c_bool;
+    procedure EnableCursor();
+    procedure DisableCursor();
+    function IsCursorOnScreen(): c_bool;
+
+    procedure ClearBackground(color: Color);
+    procedure BeginDrawing();
+    procedure EndDrawing();
+    procedure BeginMode2D(camera: Camera2D);
+    procedure EndMode2D();
+    procedure BeginMode3D(camera: Camera3D);
+    procedure EndMode3D();
+    procedure BeginTextureMode(target: RenderTexture2D);
+    procedure EndTextureMode();
+
+    procedure SetTargetFPS(fps: c_int);
+    function GetFrameTime(): c_float;
+    function GetTime(): c_double;
+    function GetFPS(): c_int;
+    procedure TakeScreenshot(fileName: c_string);
+    procedure SetConfigFlags(flags: c_uint);
+    procedure SetTraceLogLevel(logLevel: c_int);
+    procedure TraceLog(logLevel: c_int, message: c_string, ...);
+    function MemAlloc(size: c_uint): c_ptr(c_void);
+    function MemRealloc(pointer: c_ptr(c_void), size: c_uint): c_ptr(c_void);
+    procedure MemFree(pointer: c_ptr(c_void));
+
+    function IsKeyPressed(key: c_int): c_bool;
+    function IsKeyPressedRepeat(key: c_int): c_bool;
+    function IsKeyDown(key: c_int): c_bool;
+    function IsKeyReleased(key: c_int): c_bool;
+    function IsKeyUp(key: c_int): c_bool;
+    function GetKeyPressed(): c_int;
+    function GetCharPressed(): c_int;
+    procedure SetExitKey(key: c_int);
+    function IsGamepadAvailable(gamepad: c_int): c_bool;
+    function GetGamepadName(gamepad: c_int): c_string;
+    function IsGamepadButtonPressed(gamepad: c_int, button: c_int): c_bool;
+    function IsGamepadButtonDown(gamepad: c_int, button: c_int): c_bool;
+    function GetGamepadAxisCount(gamepad: c_int): c_int;
+    function GetGamepadAxisMovement(gamepad: c_int, axis: c_int): c_float;
+    function IsMouseButtonPressed(button: c_int): c_bool;
+    function IsMouseButtonDown(button: c_int): c_bool;
+    function IsMouseButtonReleased(button: c_int): c_bool;
+    function IsMouseButtonUp(button: c_int): c_bool;
+    function GetMouseX(): c_int;
+    function GetMouseY(): c_int;
+    function GetMousePosition(): Vector2;
+    function GetMouseDelta(): Vector2;
+    procedure SetMousePosition(x: c_int, y: c_int);
+    procedure SetMouseOffset(offsetX: c_int, offsetY: c_int);
+    procedure SetMouseScale(scaleX: c_float, scaleY: c_float);
+    function GetMouseWheelMove(): c_float;
+    function GetMouseWheelMoveV(): Vector2;
+    procedure SetMouseCursor(cursor: c_int);
+
+    procedure DrawPixel(posX: c_int, posY: c_int, color: Color);
+    procedure DrawPixelV(position: Vector2, color: Color);
+    procedure DrawLine(startPosX: c_int, startPosY: c_int, endPosX: c_int, endPosY: c_int, color: Color);
+    procedure DrawLineV(startPos: Vector2, endPos: Vector2, color: Color);
+    procedure DrawLineEx(startPos: Vector2, endPos: Vector2, thick: c_float, color: Color);
+    procedure DrawCircle(centerX: c_int, centerY: c_int, radius: c_float, color: Color);
+    procedure DrawCircleV(center: Vector2, radius: c_float, color: Color);
+    procedure DrawCircleLines(centerX: c_int, centerY: c_int, radius: c_float, color: Color);
+    procedure DrawEllipse(centerX: c_int, centerY: c_int, radiusH: c_float, radiusV: c_float, color: Color);
+    procedure DrawRectangle(posX: c_int, posY: c_int, width: c_int, height: c_int, color: Color);
+    procedure DrawRectangleV(position: Vector2, size: Vector2, color: Color);
+    procedure DrawRectangleRec(rec: Rectangle, color: Color);
+    procedure DrawRectanglePro(rec: Rectangle, origin: Vector2, rotation: c_float, color: Color);
+    procedure DrawRectangleLines(posX: c_int, posY: c_int, width: c_int, height: c_int, color: Color);
+    procedure DrawRectangleLinesEx(rec: Rectangle, lineThick: c_float, color: Color);
+    procedure DrawRectangleRounded(rec: Rectangle, roundness: c_float, segments: c_int, color: Color);
+    procedure DrawTriangle(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
+    procedure DrawTriangleLines(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
+    procedure DrawPoly(center: Vector2, sides: c_int, radius: c_float, rotation: c_float, color: Color);
+    function CheckCollisionRecs(rec1: Rectangle, rec2: Rectangle): c_bool;
+    function CheckCollisionCircles(center1: Vector2, radius1: c_float, center2: Vector2, radius2: c_float): c_bool;
+    function CheckCollisionCircleRec(center: Vector2, radius: c_float, rec: Rectangle): c_bool;
+    function CheckCollisionPointRec(point: Vector2, rec: Rectangle): c_bool;
+    function GetCollisionRec(rec1: Rectangle, rec2: Rectangle): Rectangle;
+
+    function LoadImage(fileName: c_string): Image;
+    function LoadImageFromTexture(texture: Texture2D): Image;
+    function LoadImageFromScreen(): Image;
+    function IsImageValid(image: Image): c_bool;
+    procedure UnloadImage(image: Image);
+    function ExportImage(image: Image, fileName: c_string): c_bool;
+    function LoadTexture(fileName: c_string): Texture2D;
+    function LoadTextureFromImage(image: Image): Texture2D;
+    function LoadRenderTexture(width: c_int, height: c_int): RenderTexture2D;
+    function IsTextureValid(texture: Texture2D): c_bool;
+    procedure UnloadTexture(texture: Texture2D);
+    function IsRenderTextureValid(target: RenderTexture2D): c_bool;
+    procedure UnloadRenderTexture(target: RenderTexture2D);
+    procedure UpdateTexture(texture: Texture2D, pixels: c_ptr(c_void));
+    procedure SetTextureFilter(texture: Texture2D, filter: c_int);
+    procedure SetTextureWrap(texture: Texture2D, wrap: c_int);
+    procedure DrawTexture(texture: Texture2D, posX: c_int, posY: c_int, tint: Color);
+    procedure DrawTextureV(texture: Texture2D, position: Vector2, tint: Color);
+    procedure DrawTextureEx(texture: Texture2D, position: Vector2, rotation: c_float, scale: c_float, tint: Color);
+    procedure DrawTextureRec(texture: Texture2D, source: Rectangle, position: Vector2, tint: Color);
+    procedure DrawTexturePro(texture: Texture2D, source: Rectangle, dest: Rectangle, origin: Vector2, rotation: c_float, tint: Color);
+    function Fade(color: Color, alpha: c_float): Color;
+    function ColorToInt(color: Color): c_int;
+    function ColorNormalize(color: Color): Vector4;
+    function ColorFromNormalized(normalized: Vector4): Color;
+    function ColorToHSV(color: Color): Vector3;
+    function ColorFromHSV(hue: c_float, saturation: c_float, value: c_float): Color;
+    function ColorTint(color: Color, tint: Color): Color;
+    function ColorBrightness(color: Color, factor: c_float): Color;
+    function ColorContrast(color: Color, contrast: c_float): Color;
+    function ColorAlpha(color: Color, alpha: c_float): Color;
+    function ColorLerp(color1: Color, color2: Color, factor: c_float): Color;
+    function GetColor(hexValue: c_uint): Color;
+
+    function GetFontDefault(): Font;
+    function LoadFont(fileName: c_string): Font;
+    function IsFontValid(font: Font): c_bool;
+    procedure UnloadFont(font: Font);
+    procedure DrawFPS(posX: c_int, posY: c_int);
+    procedure DrawText(message: c_string, posX: c_int, posY: c_int, fontSize: c_int, color: Color);
+    procedure DrawTextEx(font: Font, message: c_string, position: Vector2, fontSize: c_float, spacing: c_float, tint: Color);
+    procedure DrawTextPro(font: Font, message: c_string, position: Vector2, origin: Vector2, rotation: c_float, fontSize: c_float, spacing: c_float, tint: Color);
+    function MeasureText(message: c_string, fontSize: c_int): c_int;
+    function MeasureTextEx(font: Font, message: c_string, fontSize: c_float, spacing: c_float): Vector2;
+    function GetCodepointCount(message: c_string): c_int;
+    function TextFormat(message: c_string, ...): c_string;
+
+    procedure DrawLine3D(startPos: Vector3, endPos: Vector3, color: Color);
+    procedure DrawPoint3D(position: Vector3, color: Color);
+    procedure DrawCircle3D(center: Vector3, radius: c_float, rotationAxis: Vector3, rotationAngle: c_float, color: Color);
+    procedure DrawCube(position: Vector3, width: c_float, height: c_float, length: c_float, color: Color);
+    procedure DrawCubeV(position: Vector3, size: Vector3, color: Color);
+    procedure DrawCubeWires(position: Vector3, width: c_float, height: c_float, length: c_float, color: Color);
+    procedure DrawSphere(centerPos: Vector3, radius: c_float, color: Color);
+    procedure DrawSphereWires(centerPos: Vector3, radius: c_float, rings: c_int, slices: c_int, color: Color);
+    procedure DrawGrid(slices: c_int, spacing: c_float);
+    function CheckCollisionSpheres(center1: Vector3, radius1: c_float, center2: Vector3, radius2: c_float): c_bool;
+    function CheckCollisionBoxes(box1: BoundingBox, box2: BoundingBox): c_bool;
+    function CheckCollisionBoxSphere(box: BoundingBox, center: Vector3, radius: c_float): c_bool;
+    function GetRayCollisionSphere(ray: Ray, center: Vector3, radius: c_float): RayCollision;
+    function GetRayCollisionBox(ray: Ray, box: BoundingBox): RayCollision;
+
+    procedure InitAudioDevice();
+    procedure CloseAudioDevice();
+    function IsAudioDeviceReady(): c_bool;
+    procedure SetMasterVolume(volume: c_float);
+    function GetMasterVolume(): c_float;
+    function LoadWave(fileName: c_string): Wave;
+    function IsWaveValid(wave: Wave): c_bool;
+    procedure UnloadWave(wave: Wave);
+    function LoadSound(fileName: c_string): Sound;
+    function LoadSoundFromWave(wave: Wave): Sound;
+    function IsSoundValid(sound: Sound): c_bool;
+    procedure UnloadSound(sound: Sound);
+    procedure PlaySound(sound: Sound);
+    procedure StopSound(sound: Sound);
+    procedure PauseSound(sound: Sound);
+    procedure ResumeSound(sound: Sound);
+    function IsSoundPlaying(sound: Sound): c_bool;
+    procedure SetSoundVolume(sound: Sound, volume: c_float);
+    procedure SetSoundPitch(sound: Sound, pitch: c_float);
+    procedure SetSoundPan(sound: Sound, pan: c_float);
+    function LoadMusicStream(fileName: c_string): Music;
+    function IsMusicValid(music: Music): c_bool;
+    procedure UnloadMusicStream(music: Music);
+    procedure PlayMusicStream(music: Music);
+    function IsMusicStreamPlaying(music: Music): c_bool;
+    procedure UpdateMusicStream(music: Music);
+    procedure StopMusicStream(music: Music);
+    procedure PauseMusicStream(music: Music);
+    procedure ResumeMusicStream(music: Music);
+    procedure SeekMusicStream(music: Music, position: c_float);
+    procedure SetMusicVolume(music: Music, volume: c_float);
+    procedure SetMusicPitch(music: Music, pitch: c_float);
+    procedure SetMusicPan(music: Music, pan: c_float);
+    function GetMusicTimeLength(music: Music): c_float;
+    function GetMusicTimePlayed(music: Music): c_float;
+end;
+
+Vector2 function Vec2(real x, real y);
+begin
+    Vector2 value;
+    value.x := c_float(x);
+    value.y := c_float(y);
+    return value
+end;
+
+Vector3 function Vec3(real x, real y, real z);
+begin
+    Vector3 value;
+    value.x := c_float(x);
+    value.y := c_float(y);
+    value.z := c_float(z);
+    return value
+end;
+
+Rectangle function Rect(real x, real y, real width, real height);
+begin
+    Rectangle value;
+    value.x := c_float(x);
+    value.y := c_float(y);
+    value.width := c_float(width);
+    value.height := c_float(height);
+    return value
+end;
+
+Color function Rgba(integer red, integer green, integer blue, integer alpha);
+begin
+    Color value;
+    value.r := c_uchar(red);
+    value.g := c_uchar(green);
+    value.b := c_uchar(blue);
+    value.a := c_uchar(alpha);
+    return value
+end;
+
+Color function RayWhite;
+begin
+    return Rgba(245, 245, 245, 255)
+end;
+
+Color function White;
+begin
+    return Rgba(255, 255, 255, 255)
+end;
+
+Color function Black;
+begin
+    return Rgba(0, 0, 0, 255)
+end;

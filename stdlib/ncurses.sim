@@ -1,0 +1,126 @@
+module Ncurses;
+
+foreign c opaque record NCWindow;
+
+const integer NCURSES_OK = 0;
+const integer NCURSES_ERR = -1;
+
+const integer COLOR_BLACK = 0;
+const integer COLOR_RED = 1;
+const integer COLOR_GREEN = 2;
+const integer COLOR_YELLOW = 3;
+const integer COLOR_BLUE = 4;
+const integer COLOR_MAGENTA = 5;
+const integer COLOR_CYAN = 6;
+const integer COLOR_WHITE = 7;
+
+const integer KEY_DOWN = 258;
+const integer KEY_UP = 259;
+const integer KEY_LEFT = 260;
+const integer KEY_RIGHT = 261;
+const integer KEY_HOME = 262;
+const integer KEY_BACKSPACE = 263;
+const integer KEY_F0 = 264;
+const integer KEY_DC = 330;
+const integer KEY_IC = 331;
+const integer KEY_NPAGE = 338;
+const integer KEY_PPAGE = 339;
+const integer KEY_ENTER = 343;
+const integer KEY_END = 360;
+const integer KEY_RESIZE = 410;
+const integer KEY_MOUSE = 409;
+
+foreign c from "libncursesw.so.6" begin
+    function initscr(): c_ptr(NCWindow);
+    function endwin(): c_int;
+    function isendwin(): c_bool;
+    function refresh(): c_int;
+    function doupdate(): c_int;
+    function clear(): c_int;
+    function erase(): c_int;
+    function move(y: c_int, x: c_int): c_int;
+    function addch(ch: c_uint): c_int;
+    function addstr(message: c_string): c_int;
+    function getch(): c_int;
+    function getstr(buffer: c_ptr(c_char)): c_int;
+    function printw(format: c_string, ...): c_int;
+    function mvaddstr(y: c_int, x: c_int, message: c_string): c_int;
+    function mvprintw(y: c_int, x: c_int, format: c_string, ...): c_int;
+
+    function noecho(): c_int;
+    function echo(): c_int;
+    procedure SetInputTimeout(delay_ms: c_int) = "timeout";
+    function beep(): c_int;
+    function flash(): c_int;
+    function ungetch(ch: c_int): c_int;
+
+    function has_colors(): c_bool;
+    function can_change_color(): c_bool;
+    function start_color(): c_int;
+    function use_default_colors(): c_int;
+    function init_pair(pair: c_short, foreground: c_short, background: c_short): c_int;
+    function pair_content(pair: c_short, foreground: c_ptr(c_short), background: c_ptr(c_short)): c_int;
+    function color_content(color: c_short, red: c_ptr(c_short), green: c_ptr(c_short), blue: c_ptr(c_short)): c_int;
+    function attron(attrs: c_int): c_int;
+    function attroff(attrs: c_int): c_int;
+    function attrset(attrs: c_int): c_int;
+
+    function newwin(lines: c_int, columns: c_int, begin_y: c_int, begin_x: c_int): c_ptr(NCWindow);
+    function delwin(window: c_ptr(NCWindow)): c_int;
+    function wrefresh(window: c_ptr(NCWindow)): c_int;
+    function wclear(window: c_ptr(NCWindow)): c_int;
+    function werase(window: c_ptr(NCWindow)): c_int;
+    function wmove(window: c_ptr(NCWindow), y: c_int, x: c_int): c_int;
+    function waddch(window: c_ptr(NCWindow), ch: c_uint): c_int;
+    function waddnstr(window: c_ptr(NCWindow), message: c_string, count: c_int): c_int;
+    function wgetch(window: c_ptr(NCWindow)): c_int;
+    function box(window: c_ptr(NCWindow), vertical: c_uint, horizontal: c_uint): c_int;
+    function wborder(window: c_ptr(NCWindow), ls: c_uint, rs: c_uint, ts: c_uint, bs: c_uint, tl: c_uint, tr: c_uint, bl: c_uint, br: c_uint): c_int;
+    function mvwaddnstr(window: c_ptr(NCWindow), y: c_int, x: c_int, message: c_string, count: c_int): c_int;
+    function mvwin(window: c_ptr(NCWindow), y: c_int, x: c_int): c_int;
+    function wresize(window: c_ptr(NCWindow), lines: c_int, columns: c_int): c_int;
+    function getmaxx(window: c_ptr(NCWindow)): c_int;
+    function getmaxy(window: c_ptr(NCWindow)): c_int;
+    function getbegx(window: c_ptr(NCWindow)): c_int;
+    function getbegy(window: c_ptr(NCWindow)): c_int;
+    function getcurx(window: c_ptr(NCWindow)): c_int;
+    function getcury(window: c_ptr(NCWindow)): c_int;
+    function scrollok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    function clearok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    function leaveok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    function touchwin(window: c_ptr(NCWindow)): c_int;
+    function untouchwin(window: c_ptr(NCWindow)): c_int;
+    function is_linetouched(window: c_ptr(NCWindow), line: c_int): c_bool;
+    function is_wintouched(window: c_ptr(NCWindow)): c_bool;
+    function wscrl(window: c_ptr(NCWindow), lines: c_int): c_int;
+    function wsetscrreg(window: c_ptr(NCWindow), top: c_int, bottom: c_int): c_int;
+
+    function resizeterm(lines: c_int, columns: c_int): c_int;
+    function resize_term(lines: c_int, columns: c_int): c_int;
+    function is_term_resized(lines: c_int, columns: c_int): c_bool;
+end;
+! The terminal-mode entry points below live in libtinfo on split ncurses builds;
+! Name that DSO directly instead of relying on transitive lookup;
+foreign c from "libtinfo.so.6" begin
+    function cbreak(): c_int;
+    function nocbreak(): c_int;
+    function raw(): c_int;
+    function noraw(): c_int;
+    function curs_set(visibility: c_int): c_int;
+    function halfdelay(tenths: c_int): c_int;
+    function flushinp(): c_int;
+    function keypad(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    function nodelay(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    procedure wtimeout(window: c_ptr(NCWindow), delay_ms: c_int);
+    function napms(milliseconds: c_int): c_int;
+end;
+
+boolean function NcursesSucceeded(integer status);
+begin
+    return status <> NCURSES_ERR
+end;
+
+integer function FunctionKey(integer number);
+begin
+    return KEY_F0 + number
+end;
