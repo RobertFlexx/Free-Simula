@@ -1,0 +1,19 @@
+begin
+    class Book(title, pages);
+    text title;
+    integer pages;
+    begin
+        procedure printDetails;
+        begin
+            outtext("Title: ");
+            outtext(title);
+            outtext(", Pages: ");
+            outint(pages, 0);
+            outimage;
+        end;
+    end;
+
+    ref(Book) favoriteBook;
+    favoriteBook :- new Book("The Art of Computer Programming", 672);
+    favoriteBook.printDetails;
+end;

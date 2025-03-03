@@ -1,5 +1,7 @@
 # Changelog
 
+The history of Free Simula as far as I can reconstruct it. The project started in 2022 as a school programming-history project and then just kept going, so the early entries are a bit fuzzy. Dates are roughly right; I stopped keeping careful receipts around 1.4.
+
 ## 1.0.0 (2022-11-21)
 
 The first release. Everything after this is a decision I made one release at a time.
