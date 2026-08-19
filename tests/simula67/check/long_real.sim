@@ -1,0 +1,4 @@
+begin
+  long real x;
+  x := 1.25;
+end

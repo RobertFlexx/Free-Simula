@@ -1,0 +1,17 @@
+Class Marker;
+begin
+end;
+
+program ReferenceIdentity;
+begin
+    Ref(Marker) left;
+    Ref(Marker) right;
+    left :- new Marker();
+    right :- left;
+    if left == right then
+        outtext("same")
+    else
+        outtext("different");
+    outimage;
+    exit(0)
+end;

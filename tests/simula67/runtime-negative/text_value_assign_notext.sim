@@ -1,0 +1,4 @@
+begin
+    text t;
+    t := "nonempty"
+end;

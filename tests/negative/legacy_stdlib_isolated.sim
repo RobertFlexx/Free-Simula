@@ -1,0 +1,4 @@
+program LegacyStdlibMustNotLeak;
+begin
+    sysout.outtext("bad")
+end;

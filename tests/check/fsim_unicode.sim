@@ -1,0 +1,7 @@
+program UnicodeIdentifiers;
+begin
+    var naïve: integer := 21;
+    var λambda: integer := 2;
+    naïve := naïve * λambda;
+    assert(naïve = 42)
+end;

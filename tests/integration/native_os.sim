@@ -1,0 +1,25 @@
+program NativeOS;
+begin
+    integer handle;
+    string argument0;
+    string name;
+    string joined;
+
+    assert(os_argc() >= 1);
+    argument0 := os_argv(0);
+    assert(argument0.length > 0);
+    assert(os_path_type(".") = 2);
+    joined := os_path_join(".", "src");
+    assert(joined = "./src");
+    assert(os_path_basename("./src") = "src");
+
+    handle := os_dir_open(".");
+    assert(handle <> 0);
+    name := os_dir_next(handle);
+    assert(name.length > 0);
+    os_dir_close(handle);
+
+    outtext("native os ok");
+    outimage;
+    exit(0)
+end;

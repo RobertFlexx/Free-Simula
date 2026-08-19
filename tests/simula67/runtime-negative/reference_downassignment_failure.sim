@@ -1,0 +1,16 @@
+Class Animal;
+begin
+end;
+
+Animal Class Dog;
+begin
+end;
+
+program ReferenceDownAssignmentFailure;
+begin
+    Ref(Animal) general;
+    Ref(Dog) specific;
+    general :- new Animal();
+    specific :- general;
+    outtext("unreachable")
+end;

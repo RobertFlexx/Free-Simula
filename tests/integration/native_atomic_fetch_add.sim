@@ -1,0 +1,11 @@
+program NativeAtomicFetchAdd;
+begin
+    atomic(integer) counter;
+    integer previous;
+
+    atomic_store(counter, 10);
+    previous := atomic_fetch_add(counter, 5);
+    assert(previous = 10);
+    assert(atomic_load(counter) = 15);
+    exit(0)
+end;

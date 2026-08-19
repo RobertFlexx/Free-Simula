@@ -1,0 +1,22 @@
+type Unary = procedure(integer): integer;
+
+integer function Triple(integer value);
+begin
+    return value * 3
+end;
+
+Unary function Pick(boolean use_it);
+begin
+    if use_it then
+        return Triple
+    else
+        return Triple
+end;
+
+program HigherOrderReturnNamed;
+begin
+    Unary selected;
+    selected := Pick(true);
+    assert(selected(14) = 42);
+    exit(0)
+end;

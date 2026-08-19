@@ -1,0 +1,11 @@
+program ConditionalSwitch;
+begin
+    label first, second, done;
+    switch route := if choose then first else second;
+    boolean choose;
+    choose := false;
+    go to route(1);
+first: outtext("wrong"); go to done;
+second: outtext("conditional");
+done: outimage
+end;

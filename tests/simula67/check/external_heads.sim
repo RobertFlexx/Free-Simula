@@ -1,0 +1,9 @@
+external class cardreader = "CARDREADER", lineprinter;
+external fortran real procedure clock = "CLOCK";
+external procedure report;
+begin
+  ref(cardreader) reader;
+  real now;
+  now := clock();
+  report(reader)
+end external heads;

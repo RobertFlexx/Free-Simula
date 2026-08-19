@@ -1,0 +1,5 @@
+Class HiddenState;
+begin
+    Private:
+    integer value;
+end;

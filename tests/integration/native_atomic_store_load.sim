@@ -1,0 +1,8 @@
+program NativeAtomicStoreLoad;
+begin
+    atomic(integer) counter;
+
+    atomic_store(counter, 10);
+    assert(atomic_load(counter) = 10);
+    exit(0)
+end;

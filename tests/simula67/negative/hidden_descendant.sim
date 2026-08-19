@@ -1,0 +1,18 @@
+Class Base;
+protected secret;
+begin
+    integer secret;
+end;
+
+Base Class Middle;
+hidden secret;
+begin
+end;
+
+Middle Class Leaf;
+begin
+    integer Procedure Read;
+    begin
+        Read := secret
+    end
+end;

@@ -1,0 +1,13 @@
+Class Secret;
+begin
+    Private:
+    integer value;
+end;
+program PrivateAccess;
+begin
+    Ref(Secret) secret;
+    integer answer;
+    secret :- new Secret();
+    answer := secret.value;
+    exit(0)
+end;

@@ -1,0 +1,13 @@
+program StringExtended;
+begin
+    string source, middle;
+    source := "abcdef";
+    assert(source.byte_value(0) = 97);
+    assert(source.byte_value(5) = 102);
+    middle := source.slice(1, 3);
+    assert(middle = "bcd");
+    assert(middle.length = 3);
+    outtext(middle);
+    outimage;
+    exit(0)
+end;

@@ -1,0 +1,52 @@
+foreign c opaque record CFile;
+
+foreign c packed record PackedHeader begin
+    tag: c_uchar;
+    length: c_uint;
+end;
+
+foreign c union WordBits begin
+    whole: c_uint;
+    low: c_ushort;
+end;
+
+foreign c record Pair begin
+    code: c_int;
+    weight: c_double;
+end;
+
+foreign c from "libc.so.6" begin
+    function strlen(value: c_string): c_size = "strlen";
+    function puts(value: c_string): c_int = "puts";
+    function printf(format: c_string, ...): c_int = "printf";
+end;
+
+foreign c export function fsim_twice(value: c_int): c_int;
+begin
+    return value * 2
+end;
+
+program FFISurface;
+begin
+    var item: Pair;
+    var item_ptr: c_ptr(Pair);
+    var raw: c_ptr(c_void);
+    var callback: c_fn(c_int): c_int;
+    var bytes: c_size;
+
+    item.code := c_int(7);
+    item.weight := c_double(2.5);
+    item_ptr := c_addr(item);
+    item_ptr.store(item);
+    raw := c_ptr(c_void)(item_ptr);
+    callback := c_addr(fsim_twice);
+    bytes := c_sizeof(Pair);
+
+    assert(bytes >= c_size(12));
+    assert(c_alignof(Pair) >= c_size(4));
+    assert(c_offsetof(Pair, "weight") > c_size(0));
+    assert(callback(c_int(21)) = c_int(42));
+    assert(strlen("ffi") = c_size(3));
+    if raw = c_ptr(c_void)(none) then
+        puts("unexpected null")
+end;

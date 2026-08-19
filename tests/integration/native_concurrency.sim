@@ -1,0 +1,30 @@
+Task Class Worker;
+begin
+    Public:
+    integer function Run;
+    begin
+        yield;
+        return 42
+    end
+end;
+
+program NativeConcurrency;
+begin
+    Ref(Worker) worker;
+    future(integer) work;
+    channel(integer) mailbox;
+    mutex guard;
+    integer result;
+    worker :- new Worker();
+    lock guard;
+    send(mailbox, 7);
+    result := receive(mailbox);
+    unlock guard;
+    assert(result = 7);
+    work :- spawn worker.Run();
+    result := await work;
+    assert(result = 42);
+    outint(result);
+    outimage;
+    exit(0)
+end;

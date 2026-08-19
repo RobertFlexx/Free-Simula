@@ -1,0 +1,52 @@
+program RaylibFFICanary;
+
+foreign c record Vector2 begin
+    x: c_float;
+    y: c_float;
+end;
+
+foreign c record Color begin
+    r: c_uchar;
+    g: c_uchar;
+    b: c_uchar;
+    a: c_uchar;
+end;
+
+foreign c from "libraylib.so" begin
+    function GetFrameTime(): c_float;
+    function GetMousePosition(): Vector2;
+    procedure DrawCircleV(center: Vector2, radius: c_float, color: Color);
+    function TextFormat(format: c_string, ...): c_string;
+end;
+
+Color function MakeColor(integer red, integer green, integer blue, integer alpha);
+begin
+    Color result_color;
+    result_color.r := c_uchar(red);
+    result_color.g := c_uchar(green);
+    result_color.b := c_uchar(blue);
+    result_color.a := c_uchar(alpha);
+    return result_color
+end;
+
+Vector2 function MakeVector(real x, real y);
+begin
+    Vector2 result_vector;
+    result_vector.x := c_float(x);
+    result_vector.y := c_float(y);
+    return result_vector
+end;
+
+begin
+    real dt;
+    integer rounded;
+    Vector2 mouse;
+    Color tint;
+
+    dt := real(GetFrameTime());
+    rounded := integer(dt * 1000.0);
+    mouse := GetMousePosition();
+    tint := MakeColor(20, 80, 200, 255);
+    DrawCircleV(MakeVector(real(mouse.x), real(mouse.y)), c_float(12.0), tint);
+    TextFormat("%i", c_int(rounded))
+end;

@@ -1,0 +1,19 @@
+Class Animal;
+begin
+end;
+
+Animal Class Dog;
+begin
+end;
+
+program ReferenceDownAssignment;
+begin
+    Ref(Animal) general;
+    Ref(Dog) specific;
+    general :- new Dog();
+    specific :- general;
+    if specific in Dog then outtext("checked") else outtext("bad");
+    specific :- none;
+    if specific == none then outtext(" none") else outtext(" bad");
+    outimage
+end;

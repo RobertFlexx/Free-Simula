@@ -1,0 +1,17 @@
+% old compiler control lines are implementation defined and may be ignored
+begin
+  integer n;
+  real x;
+  long real y;
+  character c;
+  text t;
+  n := 16R2A + 2R10 + 8R7;
+  x := .2&2;
+  y := 2.5&&1;
+  c := '!65!';
+  t := "AB" "C!68!E";
+  if n = 51 and x = 20.0 and y = 25.0 and c = 'A' then
+    outtext(t);
+  ! this whole thing including its last semicolon is a direct comment ;
+  n := n + 1
+end lexical forms;

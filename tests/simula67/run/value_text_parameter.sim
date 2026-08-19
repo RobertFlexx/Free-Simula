@@ -1,0 +1,17 @@
+begin
+    procedure show(t);
+    value t;
+    text t;
+    begin
+        t.setpos(2);
+        t.putchar('X');
+        outtext(t);
+        outimage;
+    end;
+
+    text original;
+    original :- copy("abc");
+    show(original);
+    outtext(original);
+    outimage;
+end;

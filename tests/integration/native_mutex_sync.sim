@@ -1,0 +1,12 @@
+program NativeMutexSync;
+begin
+    mutex guard;
+
+    assert(mutex_try_lock(guard));
+    unlock guard;
+    lock guard;
+    unlock guard;
+    outtext("mutex sync ok");
+    outimage;
+    exit(0)
+end;

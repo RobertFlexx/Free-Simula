@@ -1,0 +1,11 @@
+program SwitchAndLabels;
+begin
+    label first, second;
+    switch route := first, second;
+    integer selected;
+    selected := 1;
+    go to route(selected);
+first: outtext("first");
+    go to second;
+second: outimage
+end;

@@ -1,0 +1,9 @@
+program NativeAtomicExchange;
+begin
+    atomic(integer) counter;
+
+    atomic_store(counter, 21);
+    assert(atomic_exchange(counter, 3) = 21);
+    assert(atomic_load(counter) = 3);
+    exit(0)
+end;

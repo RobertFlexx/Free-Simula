@@ -1,0 +1,33 @@
+Class Vault;
+protected secret;
+begin
+    integer secret;
+    Procedure Store(value);
+    integer value;
+    begin
+        secret := value
+    end;
+    integer Procedure Read;
+    begin
+        Read := secret
+    end
+end;
+
+Vault Class SealedVault;
+hidden secret;
+begin
+    integer Procedure Reveal;
+    begin
+        Reveal := secret
+    end
+end;
+
+program ClassicProtection;
+begin
+    Ref(SealedVault) item;
+    item :- new SealedVault();
+    item.Store(42);
+    outint(item.Reveal(), 0);
+    outimage;
+    exit(0)
+end;

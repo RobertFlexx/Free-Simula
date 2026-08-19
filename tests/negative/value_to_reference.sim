@@ -1,0 +1,11 @@
+Class Item;
+begin
+end;
+program BadReference;
+begin
+    Ref(Item) item;
+    integer number;
+    number := 1;
+    item :- number;
+    exit(0)
+end;

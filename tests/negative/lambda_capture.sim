@@ -1,0 +1,9 @@
+type Unary = procedure(integer): integer;
+
+program LambdaCapture;
+begin
+    integer offset;
+    Unary addOffset;
+    offset := 10;
+    addOffset := lambda (integer value): integer => value + offset
+end;

@@ -1,0 +1,12 @@
+Class Vault;
+protected secret;
+begin
+    integer secret;
+end;
+
+program ProtectedExternal;
+begin
+    Ref(Vault) item;
+    item :- new Vault();
+    outint(item.secret, 0)
+end;

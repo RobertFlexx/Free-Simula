@@ -1,0 +1,25 @@
+type Unary = procedure(integer): integer;
+
+integer function Twice(integer value);
+begin
+    return value * 2
+end;
+
+integer function Apply(Unary fn, integer value);
+begin
+    return fn(value)
+end;
+
+integer function Add(integer left, integer right);
+begin
+    return left + right
+end;
+
+program HigherOrderNestedArgs;
+begin
+    integer answer;
+
+    answer := Add(Apply(Twice, 10), Apply(Twice, 11));
+    assert(answer = 42);
+    exit(0)
+end;

@@ -1,0 +1,27 @@
+Task Class CounterTask;
+begin
+    Public:
+    integer current;
+    integer function Increment;
+    begin
+        current := current + 1;
+        yield;
+        return current
+    end;
+end;
+
+program Concurrency;
+begin
+    threadlocal var workerId: integer := 0;
+    var values: channel(integer);
+    var gate: mutex;
+    var task: Ref(CounterTask);
+    var work: future(integer);
+    task :- new CounterTask();
+    lock gate;
+    send(values, 42);
+    unlock gate;
+    work :- spawn task.Increment();
+    task.current := receive(values);
+    task.current := await work
+end;

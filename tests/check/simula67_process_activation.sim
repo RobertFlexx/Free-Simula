@@ -1,0 +1,20 @@
+Process Class Event;
+begin
+    Procedure Life;
+    begin
+        detach;
+        hold 1.0;
+        passivate
+    end;
+end;
+
+program Activation;
+begin
+    Ref(Event) first;
+    Ref(Event) second;
+    first :- new Event();
+    second :- new Event();
+    activate first at 10.0 prior;
+    activate second after first;
+    reactivate first delay 5.0
+end;

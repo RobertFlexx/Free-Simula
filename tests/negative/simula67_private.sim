@@ -1,0 +1,9 @@
+Class Vintage;
+begin
+    Private:
+    integer hidden;
+end;
+program VintageFailure;
+begin
+    exit(0)
+end;

@@ -1,0 +1,6 @@
+foreign c opaque record Handle;
+program BadOpaqueDeref;
+begin
+    var handle: c_ptr(Handle);
+    handle.load()
+end;

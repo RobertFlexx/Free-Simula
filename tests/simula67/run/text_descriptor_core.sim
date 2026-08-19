@@ -1,0 +1,24 @@
+begin
+    text whole, part, number;
+    integer parsed;
+
+    whole :- BlAnKs(8);
+    whole := "abcde";
+    part :- whole.Sub(2, 3);
+    part.SetPos(1);
+    part.PutChar('X');
+
+    SySoUt.OutText(whole.Strip);
+    SySoUt.OutChar(' ');
+
+    number :- Copy("12345");
+    number.SetPos(1);
+    parsed := number.GetInt;
+    SySoUt.OutInt(parsed, 0);
+    SySoUt.OutChar(' ');
+
+    whole.SetPos(0);
+    if not whole.More then
+        SySoUt.OutText("clamped");
+    SySoUt.OutImage
+end text descriptor core;

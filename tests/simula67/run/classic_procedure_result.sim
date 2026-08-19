@@ -1,0 +1,15 @@
+integer procedure Square(value);
+value value;
+integer value;
+begin
+    Square := value * value
+end;
+
+program ClassicProcedureResult;
+begin
+    integer answer;
+    answer := Square(7);
+    outint(answer);
+    outimage;
+    exit(0)
+end;

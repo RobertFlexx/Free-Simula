@@ -1,0 +1,1053 @@
+! neon breach -- a small arena shooter for free simula + raylib 6;
+
+program NeonBreach;
+
+
+foreign c record Vector2 begin
+    x: c_float;
+    y: c_float;
+end;
+
+foreign c record Rectangle begin
+    x: c_float;
+    y: c_float;
+    width: c_float;
+    height: c_float;
+end;
+
+foreign c record Color begin
+    r: c_uchar;
+    g: c_uchar;
+    b: c_uchar;
+    a: c_uchar;
+end;
+
+foreign c from "libraylib.so" begin
+    procedure SetConfigFlags(flags: c_uint);
+    procedure InitWindow(width: c_int, height: c_int, title: c_string);
+    procedure CloseWindow();
+    function WindowShouldClose(): c_bool;
+    procedure SetTargetFPS(fps: c_int);
+    function GetFrameTime(): c_float;
+    function GetTime(): c_double;
+
+    function IsKeyDown(key: c_int): c_bool;
+    function IsKeyPressed(key: c_int): c_bool;
+    function IsMouseButtonDown(button: c_int): c_bool;
+    function IsMouseButtonPressed(button: c_int): c_bool;
+    function GetMousePosition(): Vector2;
+
+    function GetRandomValue(minimum: c_int, maximum: c_int): c_int;
+
+    procedure BeginDrawing();
+    procedure EndDrawing();
+    procedure ClearBackground(color: Color);
+
+    procedure DrawCircleV(center: Vector2, radius: c_float, color: Color);
+    procedure DrawCircleLines(centerX: c_int, centerY: c_int, radius: c_float, color: Color);
+    procedure DrawCircleGradient(center: Vector2, radius: c_float,
+                                 inside_color: Color, outside_color: Color);
+    procedure DrawRectangle(x: c_int, y: c_int, width: c_int, height: c_int, color: Color);
+    procedure DrawRectangleRec(rec: Rectangle, color: Color);
+    procedure DrawRectangleRounded(rec: Rectangle, roundness: c_float,
+                                   segments: c_int, color: Color);
+    procedure DrawRectangleRoundedLinesEx(rec: Rectangle, roundness: c_float,
+                                          segments: c_int, lineThick: c_float, color: Color);
+    procedure DrawLineEx(startPos: Vector2, endPos: Vector2,
+                         thick: c_float, color: Color);
+    procedure DrawTriangle(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
+    procedure DrawRing(center: Vector2, innerRadius: c_float, outerRadius: c_float,
+                       startAngle: c_float, endAngle: c_float,
+                       segments: c_int, color: Color);
+
+    procedure DrawText(glyph_text: c_string, posX: c_int, posY: c_int,
+                       fontSize: c_int, color: Color);
+    function MeasureText(glyph_text: c_string, fontSize: c_int): c_int;
+    function TextFormat(format_text: c_string, ...): c_string;
+    procedure DrawFPS(posX: c_int, posY: c_int);
+end;
+
+foreign c from "libm.so.6" begin
+    function c_sqrt(x: c_double): c_double = "sqrt";
+    function c_sin(x: c_double): c_double = "sin";
+    function c_cos(x: c_double): c_double = "cos";
+end;
+
+const integer ScreenWidth = 1280;
+const integer ScreenHeight = 720;
+const integer MaxEnemies = 72;
+const integer MaxBullets = 192;
+const integer MaxParticles = 420;
+const integer KeyW = 87;
+const integer KeyA = 65;
+const integer KeyS = 83;
+const integer KeyD = 68;
+const integer KeyP = 80;
+const integer KeyR = 82;
+const integer KeySpace = 32;
+const integer MouseLeft = 0;
+const integer FlagMsaa4x = 32;
+
+Color function Rgba(integer red, integer green, integer blue, integer alpha);
+begin
+    Color c;
+    c.r := c_uchar(red);
+    c.g := c_uchar(green);
+    c.b := c_uchar(blue);
+    c.a := c_uchar(alpha);
+    return c
+end;
+
+Vector2 function Vec(real vx, real vy);
+begin
+    Vector2 v;
+    v.x := c_float(vx);
+    v.y := c_float(vy);
+    return v
+end;
+
+Rectangle function Rect(real rx, real ry, real rw, real rh);
+begin
+    Rectangle r;
+    r.x := c_float(rx);
+    r.y := c_float(ry);
+    r.width := c_float(rw);
+    r.height := c_float(rh);
+    return r
+end;
+
+real function Root(real x);
+begin
+    if x <= 0.0 then
+        return 0.0;
+    return real(c_sqrt(c_double(x)))
+end;
+
+real function Sin(real x);
+begin
+    return real(c_sin(c_double(x)))
+end;
+
+real function Cos(real x);
+begin
+    return real(c_cos(c_double(x)))
+end;
+
+real function Clamp(real x, real lower_bound, real upper_bound);
+begin
+    if x < lower_bound then
+        return lower_bound;
+    if x > upper_bound then
+        return upper_bound;
+    return x
+end;
+
+real function DistanceSquared(real ax, real ay, real bx, real by);
+begin
+    real dx;
+    real dy;
+    dx := ax - bx;
+    dy := ay - by;
+    return dx * dx + dy * dy
+end;
+
+real function RandomReal(integer lower_bound, integer upper_bound);
+begin
+    return real(GetRandomValue(c_int(lower_bound), c_int(upper_bound)))
+end;
+
+Class Enemy;
+begin
+    Public:
+    boolean active;
+    integer kind;
+    real x;
+    real y;
+    real vx;
+    real vy;
+    real radius;
+    real speed;
+    integer hp;
+    integer max_hp;
+    real touch_delay;
+    real phase;
+end;
+
+Class Bullet;
+begin
+    Public:
+    boolean active;
+    real x;
+    real y;
+    real old_x;
+    real old_y;
+    real vx;
+    real vy;
+    real life;
+    real radius;
+end;
+
+Class Particle;
+begin
+    Public:
+    boolean active;
+    real x;
+    real y;
+    real vx;
+    real vy;
+    real life;
+    real max_life;
+    real size;
+    integer color_kind;
+end;
+
+Class Game;
+begin
+    Private:
+    array[1:72] Ref(Enemy) enemies;
+    array[1:192] Ref(Bullet) bullets;
+    array[1:420] Ref(Particle) particles;
+
+    real player_x;
+    real player_y;
+    real aim_x;
+    real aim_y;
+    real fire_wait;
+    real dash_wait;
+    real dash_time;
+    real hurt_time;
+
+    integer health;
+    integer score;
+    integer wave;
+    integer wave_kills;
+    integer total_kills;
+    integer combo;
+    real combo_time;
+    real spawn_wait;
+
+    boolean paused;
+    boolean game_over;
+
+    real shake_time;
+    real shake_power;
+
+    boolean core_active;
+    real core_x;
+    real core_y;
+    real core_phase;
+
+    Public:
+    Procedure Init;
+    begin
+        integer i;
+
+        player_x := 640.0;
+        player_y := 360.0;
+        aim_x := 1.0;
+        aim_y := 0.0;
+        fire_wait := 0.0;
+        dash_wait := 0.0;
+        dash_time := 0.0;
+        hurt_time := 0.0;
+
+        health := 100;
+        score := 0;
+        wave := 1;
+        wave_kills := 0;
+        total_kills := 0;
+        combo := 0;
+        combo_time := 0.0;
+        spawn_wait := 0.25;
+
+        paused := false;
+        game_over := false;
+
+        shake_time := 0.0;
+        shake_power := 0.0;
+
+        core_active := false;
+        core_x := 0.0;
+        core_y := 0.0;
+        core_phase := 0.0;
+
+        for i := 1 step 1 until MaxEnemies do
+        begin
+            enemies[i] :- new Enemy();
+            enemies[i].active := false
+        end;
+
+        for i := 1 step 1 until MaxBullets do
+        begin
+            bullets[i] :- new Bullet();
+            bullets[i].active := false
+        end;
+
+        for i := 1 step 1 until MaxParticles do
+        begin
+            particles[i] :- new Particle();
+            particles[i].active := false
+        end
+    end;
+
+    Procedure Restart;
+    begin
+        integer i;
+
+        player_x := 640.0;
+        player_y := 360.0;
+        fire_wait := 0.0;
+        dash_wait := 0.0;
+        dash_time := 0.0;
+        hurt_time := 0.0;
+        health := 100;
+        score := 0;
+        wave := 1;
+        wave_kills := 0;
+        total_kills := 0;
+        combo := 0;
+        combo_time := 0.0;
+        spawn_wait := 0.4;
+        paused := false;
+        game_over := false;
+        shake_time := 0.0;
+        shake_power := 0.0;
+        core_active := false;
+
+        for i := 1 step 1 until MaxEnemies do
+            enemies[i].active := false;
+        for i := 1 step 1 until MaxBullets do
+            bullets[i].active := false;
+        for i := 1 step 1 until MaxParticles do
+            particles[i].active := false
+    end;
+
+    Procedure Burst(real px, real py, integer count, integer color_kind,
+                    real speed_low, real speed_high);
+    begin
+        integer i;
+        integer slot;
+        integer attempt;
+        real angle;
+        real speed;
+        Ref(Particle) p;
+
+        for i := 1 step 1 until count do
+        begin
+            slot := 0;
+            attempt := 1;
+            while (attempt <= MaxParticles) and (slot = 0) do
+            begin
+                if not particles[attempt].active then
+                    slot := attempt
+                else
+                    attempt := attempt + 1
+            end;
+
+            if slot > 0 then
+            begin
+                p :- particles[slot];
+                angle := RandomReal(0, 6283) / 1000.0;
+                speed := RandomReal(integer(speed_low), integer(speed_high));
+                p.active := true;
+                p.x := px;
+                p.y := py;
+                p.vx := Cos(angle) * speed;
+                p.vy := Sin(angle) * speed;
+                p.life := RandomReal(22, 62) / 100.0;
+                p.max_life := p.life;
+                p.size := RandomReal(2, 6);
+                p.color_kind := color_kind
+            end
+        end
+    end;
+
+    Procedure SpawnEnemy;
+    begin
+        integer i;
+        integer slot;
+        integer side;
+        integer roll;
+        Ref(Enemy) e;
+
+        slot := 0;
+        i := 1;
+        while (i <= MaxEnemies) and (slot = 0) do
+        begin
+            if not enemies[i].active then
+                slot := i
+            else
+                i := i + 1
+        end;
+
+        if slot = 0 then
+            return;
+
+        e :- enemies[slot];
+        side := integer(GetRandomValue(c_int(0), c_int(3)));
+        if side = 0 then
+        begin
+            e.x := -40.0;
+            e.y := RandomReal(40, ScreenHeight - 40)
+        end
+        else if side = 1 then
+        begin
+            e.x := real(ScreenWidth) + 40.0;
+            e.y := RandomReal(40, ScreenHeight - 40)
+        end
+        else if side = 2 then
+        begin
+            e.x := RandomReal(40, ScreenWidth - 40);
+            e.y := -40.0
+        end
+        else
+        begin
+            e.x := RandomReal(40, ScreenWidth - 40);
+            e.y := real(ScreenHeight) + 40.0
+        end;
+
+        roll := integer(GetRandomValue(c_int(0), c_int(99)));
+        if (wave >= 3) and (roll < 18) then
+            e.kind := 2
+        else if (wave >= 2) and (roll < 42) then
+            e.kind := 1
+        else
+            e.kind := 0;
+
+        if e.kind = 0 then
+        begin
+            e.radius := 14.0;
+            e.speed := 112.0 + real(wave) * 3.5;
+            e.max_hp := 1 + wave // 7
+        end
+        else if e.kind = 1 then
+        begin
+            e.radius := 23.0;
+            e.speed := 64.0 + real(wave) * 2.0;
+            e.max_hp := 3 + wave // 3
+        end
+        else
+        begin
+            e.radius := 17.0;
+            e.speed := 88.0 + real(wave) * 2.8;
+            e.max_hp := 2 + wave // 4
+        end;
+
+        e.hp := e.max_hp;
+        e.vx := 0.0;
+        e.vy := 0.0;
+        e.touch_delay := 0.0;
+        e.phase := RandomReal(0, 6283) / 1000.0;
+        e.active := true
+    end;
+
+    Procedure Shoot;
+    begin
+        integer i;
+        integer slot;
+        real len;
+        real dx;
+        real dy;
+        Ref(Bullet) b;
+
+        slot := 0;
+        i := 1;
+        while (i <= MaxBullets) and (slot = 0) do
+        begin
+            if not bullets[i].active then
+                slot := i
+            else
+                i := i + 1
+        end;
+        if slot = 0 then
+            return;
+
+        dx := aim_x;
+        dy := aim_y;
+        len := Root(dx * dx + dy * dy);
+        if len < 0.001 then
+            return;
+
+        dx := dx / len;
+        dy := dy / len;
+
+        b :- bullets[slot];
+        b.active := true;
+        b.x := player_x + dx * 22.0;
+        b.y := player_y + dy * 22.0;
+        b.old_x := b.x;
+        b.old_y := b.y;
+        b.vx := dx * 790.0;
+        b.vy := dy * 790.0;
+        b.life := 1.05;
+        b.radius := 4.0;
+
+        Burst(b.x, b.y, 2, 0, 35.0, 90.0)
+    end;
+
+    Procedure HitPlayer(real from_x, real from_y);
+    begin
+        real dx;
+        real dy;
+        real len;
+
+        if hurt_time > 0.0 then
+            return;
+        if dash_time > 0.0 then
+            return;
+
+        health := health - 18;
+        hurt_time := 0.65;
+        combo := 0;
+        combo_time := 0.0;
+        shake_time := 0.22;
+        shake_power := 10.0;
+
+        dx := player_x - from_x;
+        dy := player_y - from_y;
+        len := Root(dx * dx + dy * dy);
+        if len > 0.001 then
+        begin
+            player_x := player_x + dx / len * 20.0;
+            player_y := player_y + dy / len * 20.0
+        end;
+
+        Burst(player_x, player_y, 24, 2, 80.0, 260.0);
+
+        if health <= 0 then
+        begin
+            health := 0;
+            game_over := true;
+            Burst(player_x, player_y, 70, 2, 90.0, 360.0)
+        end
+    end;
+
+    Procedure EnemyKilled(Ref(Enemy) e);
+    begin
+        integer bonus;
+
+        e.active := false;
+        total_kills := total_kills + 1;
+        wave_kills := wave_kills + 1;
+        combo := combo + 1;
+        combo_time := 2.4;
+
+        bonus := 100;
+        if e.kind = 1 then
+            bonus := 240
+        else if e.kind = 2 then
+            bonus := 175;
+
+        score := score + bonus * (1 + combo // 5);
+        shake_time := 0.10;
+        shake_power := 4.0 + e.radius * 0.12;
+        Burst(e.x, e.y, 16 + e.kind * 7, 1 + e.kind, 55.0, 245.0);
+
+        if (total_kills mod 10 = 0) and (not core_active) then
+        begin
+            core_active := true;
+            core_x := e.x;
+            core_y := e.y;
+            core_phase := 0.0
+        end;
+
+        if wave_kills >= 10 + wave * 3 then
+        begin
+            wave := wave + 1;
+            wave_kills := 0;
+            score := score + wave * 300;
+            Burst(player_x, player_y, 34, 0, 80.0, 280.0)
+        end
+    end;
+
+    Procedure Update(real dt);
+    begin
+        integer i;
+        integer j;
+        real move_x;
+        real move_y;
+        real move_len;
+        real speed;
+        real dx;
+        real dy;
+        real dist;
+        real dist_sq;
+        real nx;
+        real ny;
+        real tangent_x;
+        real tangent_y;
+        real now;
+        real spawn_rate;
+        Vector2 mouse;
+        Ref(Enemy) e;
+        Ref(Bullet) b;
+        Ref(Particle) p;
+
+        if IsKeyPressed(c_int(KeyP)) <> c_bool(0) then
+            paused := not paused;
+
+        if game_over then
+        begin
+            if IsKeyPressed(c_int(KeyR)) <> c_bool(0) then
+                Restart();
+            return
+        end;
+
+        if paused then
+            return;
+
+        if fire_wait > 0.0 then fire_wait := fire_wait - dt;
+        if dash_wait > 0.0 then dash_wait := dash_wait - dt;
+        if dash_time > 0.0 then dash_time := dash_time - dt;
+        if hurt_time > 0.0 then hurt_time := hurt_time - dt;
+        if shake_time > 0.0 then shake_time := shake_time - dt;
+
+        if combo_time > 0.0 then
+        begin
+            combo_time := combo_time - dt;
+            if combo_time <= 0.0 then
+                combo := 0
+        end;
+
+        move_x := 0.0;
+        move_y := 0.0;
+        if IsKeyDown(c_int(KeyW)) <> c_bool(0) then move_y := move_y - 1.0;
+        if IsKeyDown(c_int(KeyS)) <> c_bool(0) then move_y := move_y + 1.0;
+        if IsKeyDown(c_int(KeyA)) <> c_bool(0) then move_x := move_x - 1.0;
+        if IsKeyDown(c_int(KeyD)) <> c_bool(0) then move_x := move_x + 1.0;
+
+        move_len := Root(move_x * move_x + move_y * move_y);
+        if move_len > 0.001 then
+        begin
+            move_x := move_x / move_len;
+            move_y := move_y / move_len
+        end;
+
+        if (IsKeyPressed(c_int(KeySpace)) <> c_bool(0)) and
+           (dash_wait <= 0.0) and (move_len > 0.001) then
+        begin
+            dash_time := 0.15;
+            dash_wait := 1.0;
+            shake_time := 0.12;
+            shake_power := 3.0;
+            Burst(player_x, player_y, 18, 0, 45.0, 175.0)
+        end;
+
+        speed := 330.0;
+        if dash_time > 0.0 then speed := 920.0;
+        player_x := Clamp(player_x + move_x * speed * dt, 24.0, real(ScreenWidth) - 24.0);
+        player_y := Clamp(player_y + move_y * speed * dt, 24.0, real(ScreenHeight) - 24.0);
+
+        mouse := GetMousePosition();
+        aim_x := real(mouse.x) - player_x;
+        aim_y := real(mouse.y) - player_y;
+
+        if (IsMouseButtonDown(c_int(MouseLeft)) <> c_bool(0)) and (fire_wait <= 0.0) then
+        begin
+            Shoot();
+            fire_wait := 0.095
+        end;
+
+        spawn_wait := spawn_wait - dt;
+        if spawn_wait <= 0.0 then
+        begin
+            SpawnEnemy();
+            spawn_rate := 0.78 - real(wave) * 0.035;
+            if spawn_rate < 0.18 then spawn_rate := 0.18;
+            spawn_wait := spawn_rate
+        end;
+
+        i := 1;
+        while i <= MaxBullets do
+        begin
+            b :- bullets[i];
+            if b.active then
+            begin
+                b.old_x := b.x;
+                b.old_y := b.y;
+                b.x := b.x + b.vx * dt;
+                b.y := b.y + b.vy * dt;
+                b.life := b.life - dt;
+
+                if (b.life <= 0.0) or (b.x < -30.0) or
+                   (b.x > real(ScreenWidth) + 30.0) or
+                   (b.y < -30.0) or (b.y > real(ScreenHeight) + 30.0) then
+                    b.active := false
+                else
+                begin
+                    j := 1;
+                    while (j <= MaxEnemies) and b.active do
+                    begin
+                        e :- enemies[j];
+                        if e.active then
+                        begin
+                            dist_sq := DistanceSquared(b.x, b.y, e.x, e.y);
+                            if dist_sq <= (b.radius + e.radius) * (b.radius + e.radius) then
+                            begin
+                                b.active := false;
+                                e.hp := e.hp - 1;
+                                Burst(b.x, b.y, 7, 0, 55.0, 190.0);
+                                if e.hp <= 0 then
+                                    EnemyKilled(e)
+                                else
+                                begin
+                                    shake_time := 0.04;
+                                    shake_power := 1.5
+                                end
+                            end
+                        end;
+                        j := j + 1
+                    end
+                end
+            end;
+            i := i + 1
+        end;
+
+        now := real(GetTime());
+        i := 1;
+        while i <= MaxEnemies do
+        begin
+            e :- enemies[i];
+            if e.active then
+            begin
+                if e.touch_delay > 0.0 then
+                    e.touch_delay := e.touch_delay - dt;
+
+                dx := player_x - e.x;
+                dy := player_y - e.y;
+                dist := Root(dx * dx + dy * dy);
+                if dist > 0.001 then
+                begin
+                    nx := dx / dist;
+                    ny := dy / dist
+                end
+                else
+                begin
+                    nx := 0.0;
+                    ny := 0.0
+                end;
+
+                if e.kind = 2 then
+                begin
+                    tangent_x := -ny;
+                    tangent_y := nx;
+                    e.vx := nx * e.speed + tangent_x * Sin(now * 3.0 + e.phase) * 95.0;
+                    e.vy := ny * e.speed + tangent_y * Sin(now * 3.0 + e.phase) * 95.0
+                end
+                else
+                begin
+                    e.vx := nx * e.speed;
+                    e.vy := ny * e.speed
+                end;
+
+                e.x := e.x + e.vx * dt;
+                e.y := e.y + e.vy * dt;
+
+                if dist <= e.radius + 17.0 then
+                begin
+                    HitPlayer(e.x, e.y);
+                    e.touch_delay := 0.45
+                end
+            end;
+            i := i + 1
+        end;
+
+        if core_active then
+        begin
+            core_phase := core_phase + dt * 3.0;
+            if DistanceSquared(player_x, player_y, core_x, core_y) < 34.0 * 34.0 then
+            begin
+                core_active := false;
+                health := health + 24;
+                if health > 100 then health := 100;
+                score := score + 500;
+                Burst(core_x, core_y, 30, 4, 75.0, 260.0)
+            end
+        end;
+
+        i := 1;
+        while i <= MaxParticles do
+        begin
+            p :- particles[i];
+            if p.active then
+            begin
+                p.life := p.life - dt;
+                if p.life <= 0.0 then
+                    p.active := false
+                else
+                begin
+                    p.x := p.x + p.vx * dt;
+                    p.y := p.y + p.vy * dt;
+                    p.vx := p.vx * (1.0 - 2.8 * dt);
+                    p.vy := p.vy * (1.0 - 2.8 * dt)
+                end
+            end;
+            i := i + 1
+        end
+    end;
+
+    Procedure Draw;
+    begin
+        integer i;
+        integer gx;
+        integer gy;
+        integer hp_width;
+        integer enemy_hp_width;
+        integer title_width;
+        real now;
+        real pulse;
+        real alpha_scale;
+        real aim_len;
+        real dx;
+        real dy;
+        real nx;
+        real ny;
+        real sx;
+        real sy;
+        real shake_x;
+        real shake_y;
+        Vector2 a;
+        Vector2 b;
+        Vector2 c;
+        Vector2 center;
+        Rectangle panel;
+        Color enemy_color;
+        Color particle_color;
+        Ref(Enemy) e;
+        Ref(Bullet) bullet;
+        Ref(Particle) p;
+
+        now := real(GetTime());
+        shake_x := 0.0;
+        shake_y := 0.0;
+        if shake_time > 0.0 then
+        begin
+            shake_x := RandomReal(-100, 100) / 100.0 * shake_power;
+            shake_y := RandomReal(-100, 100) / 100.0 * shake_power
+        end;
+
+        BeginDrawing();
+        ClearBackground(Rgba(6, 8, 16, 255));
+
+        gx := -40;
+        while gx <= ScreenWidth + 40 do
+        begin
+            a := Vec(real(gx) + shake_x, shake_y);
+            b := Vec(real(gx) + shake_x, real(ScreenHeight) + shake_y);
+            DrawLineEx(a, b, c_float(1.0), Rgba(16, 31, 49, 110));
+            gx := gx + 40
+        end;
+        gy := -40;
+        while gy <= ScreenHeight + 40 do
+        begin
+            a := Vec(shake_x, real(gy) + shake_y);
+            b := Vec(real(ScreenWidth) + shake_x, real(gy) + shake_y);
+            DrawLineEx(a, b, c_float(1.0), Rgba(16, 31, 49, 110));
+            gy := gy + 40
+        end;
+
+        center := Vec(real(ScreenWidth) * 0.5 + shake_x, real(ScreenHeight) * 0.5 + shake_y);
+        pulse := 0.5 + Sin(now * 1.6) * 0.5;
+        DrawRing(center, c_float(265.0 + pulse * 12.0), c_float(266.0 + pulse * 12.0),
+                 c_float(0.0), c_float(360.0), c_int(96), Rgba(22, 57, 84, 95));
+        DrawRing(center, c_float(430.0 + pulse * 18.0), c_float(431.0 + pulse * 18.0),
+                 c_float(0.0), c_float(360.0), c_int(128), Rgba(16, 41, 68, 75));
+
+        i := 1;
+        while i <= MaxParticles do
+        begin
+            p :- particles[i];
+            if p.active then
+            begin
+                alpha_scale := p.life / p.max_life;
+                if p.color_kind = 0 then
+                    particle_color := Rgba(50, 229, 255, integer(220.0 * alpha_scale))
+                else if p.color_kind = 1 then
+                    particle_color := Rgba(255, 66, 92, integer(230.0 * alpha_scale))
+                else if p.color_kind = 2 then
+                    particle_color := Rgba(255, 170, 66, integer(230.0 * alpha_scale))
+                else if p.color_kind = 3 then
+                    particle_color := Rgba(180, 90, 255, integer(230.0 * alpha_scale))
+                else
+                    particle_color := Rgba(83, 255, 154, integer(230.0 * alpha_scale));
+
+                DrawCircleV(Vec(p.x + shake_x, p.y + shake_y),
+                            c_float(p.size * alpha_scale + 0.5), particle_color)
+            end;
+            i := i + 1
+        end;
+
+        i := 1;
+        while i <= MaxBullets do
+        begin
+            bullet :- bullets[i];
+            if bullet.active then
+            begin
+                a := Vec(bullet.old_x + shake_x, bullet.old_y + shake_y);
+                b := Vec(bullet.x + shake_x, bullet.y + shake_y);
+                DrawLineEx(a, b, c_float(5.0), Rgba(35, 210, 255, 110));
+                DrawCircleV(b, c_float(4.0), Rgba(207, 252, 255, 255))
+            end;
+            i := i + 1
+        end;
+
+        i := 1;
+        while i <= MaxEnemies do
+        begin
+            e :- enemies[i];
+            if e.active then
+            begin
+                if e.kind = 0 then
+                    enemy_color := Rgba(255, 62, 92, 255)
+                else if e.kind = 1 then
+                    enemy_color := Rgba(181, 82, 255, 255)
+                else
+                    enemy_color := Rgba(70, 140, 255, 255);
+
+                center := Vec(e.x + shake_x, e.y + shake_y);
+                DrawCircleGradient(center, c_float(e.radius + 8.0),
+                                   enemy_color, Rgba(20, 10, 26, 20));
+                DrawCircleV(center, c_float(e.radius), Rgba(13, 16, 27, 255));
+                DrawCircleLines(c_int(e.x + shake_x), c_int(e.y + shake_y),
+                                c_float(e.radius), enemy_color);
+
+                if e.kind = 2 then
+                begin
+                    DrawRing(center, c_float(e.radius + 4.0), c_float(e.radius + 6.0),
+                             c_float(now * 100.0), c_float(now * 100.0 + 220.0),
+                             c_int(28), Rgba(110, 185, 255, 190))
+                end;
+
+                if e.max_hp > 1 then
+                begin
+                    enemy_hp_width := integer((e.radius * 2.0) * real(e.hp) / real(e.max_hp));
+                    DrawRectangle(c_int(e.x - e.radius + shake_x),
+                                  c_int(e.y + e.radius + 6.0 + shake_y),
+                                  c_int(e.radius * 2.0), c_int(3), Rgba(35, 29, 47, 220));
+                    DrawRectangle(c_int(e.x - e.radius + shake_x),
+                                  c_int(e.y + e.radius + 6.0 + shake_y),
+                                  c_int(enemy_hp_width), c_int(3), enemy_color)
+                end
+            end;
+            i := i + 1
+        end;
+
+        if core_active then
+        begin
+            pulse := 1.0 + Sin(core_phase) * 0.16;
+            center := Vec(core_x + shake_x, core_y + shake_y);
+            DrawCircleGradient(center, c_float(24.0 * pulse),
+                               Rgba(61, 255, 142, 170), Rgba(16, 50, 35, 0));
+            DrawRing(center, c_float(12.0 * pulse), c_float(16.0 * pulse),
+                     c_float(core_phase * 40.0), c_float(core_phase * 40.0 + 280.0),
+                     c_int(24), Rgba(108, 255, 173, 255))
+        end;
+
+        aim_len := Root(aim_x * aim_x + aim_y * aim_y);
+        if aim_len < 0.001 then aim_len := 1.0;
+        nx := aim_x / aim_len;
+        ny := aim_y / aim_len;
+
+        center := Vec(player_x + shake_x, player_y + shake_y);
+        if hurt_time > 0.0 then
+            DrawCircleGradient(center, c_float(31.0),
+                               Rgba(255, 177, 83, 190), Rgba(255, 70, 70, 0))
+        else
+            DrawCircleGradient(center, c_float(30.0),
+                               Rgba(49, 225, 255, 170), Rgba(20, 63, 92, 0));
+
+        if dash_time > 0.0 then
+            DrawRing(center, c_float(20.0), c_float(27.0), c_float(0.0), c_float(360.0),
+                     c_int(36), Rgba(153, 246, 255, 190));
+
+        dx := nx * 22.0;
+        dy := ny * 22.0;
+        a := Vec(player_x + dx + shake_x, player_y + dy + shake_y);
+        b := Vec(player_x - ny * 11.0 - nx * 11.0 + shake_x,
+                 player_y + nx * 11.0 - ny * 11.0 + shake_y);
+        c := Vec(player_x + ny * 11.0 - nx * 11.0 + shake_x,
+                 player_y - nx * 11.0 - ny * 11.0 + shake_y);
+        DrawTriangle(a, b, c, Rgba(202, 250, 255, 255));
+        DrawCircleLines(c_int(player_x + shake_x), c_int(player_y + shake_y),
+                        c_float(18.0), Rgba(54, 228, 255, 255));
+
+        panel := Rect(20.0, 18.0, 350.0, 91.0);
+        DrawRectangleRounded(panel, c_float(0.18), c_int(10), Rgba(8, 12, 23, 225));
+        DrawRectangleRoundedLinesEx(panel, c_float(0.18), c_int(10), c_float(1.5), Rgba(44, 88, 118, 220));
+        DrawText("NEON BREACH", c_int(38), c_int(31), c_int(22), Rgba(198, 247, 255, 255));
+        DrawText(TextFormat("WAVE %02i", c_int(wave)), c_int(38), c_int(60), c_int(18), Rgba(78, 215, 255, 255));
+        DrawText(TextFormat("SCORE %08i", c_int(score)), c_int(151), c_int(60), c_int(18), Rgba(226, 238, 247, 255));
+
+        hp_width := health * 3;
+        DrawRectangle(c_int(38), c_int(87), c_int(300), c_int(8), Rgba(38, 31, 44, 255));
+        if health > 35 then
+            DrawRectangle(c_int(38), c_int(87), c_int(hp_width), c_int(8), Rgba(64, 240, 151, 255))
+        else
+            DrawRectangle(c_int(38), c_int(87), c_int(hp_width), c_int(8), Rgba(255, 75, 92, 255));
+
+        panel := Rect(real(ScreenWidth) - 265.0, 18.0, 245.0, 91.0);
+        DrawRectangleRounded(panel, c_float(0.18), c_int(10), Rgba(8, 12, 23, 225));
+        DrawRectangleRoundedLinesEx(panel, c_float(0.18), c_int(10), c_float(1.5), Rgba(44, 88, 118, 220));
+        DrawText(TextFormat("COMBO x%i", c_int(1 + combo // 5)),
+                 c_int(ScreenWidth - 247), c_int(33), c_int(20),
+                 Rgba(255, 191, 74, 255));
+        DrawText(TextFormat("KILLS %i", c_int(total_kills)),
+                 c_int(ScreenWidth - 247), c_int(62), c_int(17),
+                 Rgba(205, 220, 234, 255));
+        if dash_wait <= 0.0 then
+            DrawText("DASH READY", c_int(ScreenWidth - 247), c_int(84), c_int(15), Rgba(83, 255, 168, 255))
+        else
+            DrawText("DASH RECHARGING", c_int(ScreenWidth - 247), c_int(84), c_int(15), Rgba(117, 132, 153, 255));
+
+        DrawText("WASD move   mouse aim   LMB fire   SPACE dash   P pause",
+                 c_int(24), c_int(ScreenHeight - 31), c_int(16), Rgba(92, 113, 135, 220));
+        DrawFPS(c_int(ScreenWidth - 92), c_int(ScreenHeight - 29));
+
+        if paused and (not game_over) then
+        begin
+            DrawRectangle(c_int(0), c_int(0), c_int(ScreenWidth), c_int(ScreenHeight), Rgba(3, 5, 10, 170));
+            title_width := integer(MeasureText("PAUSED", c_int(48)));
+            DrawText("PAUSED", c_int((ScreenWidth - title_width) // 2), c_int(290), c_int(48), Rgba(210, 247, 255, 255));
+            DrawText("press P to return", c_int(548), c_int(354), c_int(20), Rgba(111, 183, 210, 255))
+        end;
+
+        if game_over then
+        begin
+            DrawRectangle(c_int(0), c_int(0), c_int(ScreenWidth), c_int(ScreenHeight), Rgba(4, 5, 10, 205));
+            title_width := integer(MeasureText("SIGNAL LOST", c_int(54)));
+            DrawText("SIGNAL LOST", c_int((ScreenWidth - title_width) // 2), c_int(250), c_int(54), Rgba(255, 80, 104, 255));
+            DrawText(TextFormat("score %i   wave %i   kills %i", c_int(score), c_int(wave), c_int(total_kills)),
+                     c_int(454), c_int(330), c_int(22), Rgba(213, 227, 239, 255));
+            DrawText("press R to reboot", c_int(523), c_int(382), c_int(22), Rgba(68, 225, 255, 255))
+        end;
+
+        EndDrawing()
+    end;
+end;
+
+begin
+    Ref(Game) game;
+    real dt;
+
+    assert(c_sizeof(Vector2) = c_size(8));
+    assert(c_sizeof(Rectangle) = c_size(16));
+    assert(c_sizeof(Color) = c_size(4));
+
+    SetConfigFlags(c_uint(FlagMsaa4x));
+    InitWindow(c_int(ScreenWidth), c_int(ScreenHeight), "Neon Breach - Free Simula + raylib");
+    SetTargetFPS(c_int(144));
+
+    game :- new Game();
+    game.Init();
+
+    while WindowShouldClose() = c_bool(0) do
+    begin
+        dt := real(GetFrameTime());
+        if dt > 0.05 then dt := 0.05;
+        game.Update(dt);
+        game.Draw()
+    end;
+
+    CloseWindow();
+    exit(0)
+end;

@@ -1,0 +1,15 @@
+program UnderscoreArrays;
+
+const integer max_items = 8;
+array[1:max_items] integer item_value;
+array[-2:2] real signed_range;
+
+begin
+    integer loop_index;
+    loop_index := 1;
+    while loop_index <= max_items do
+    begin
+        item_value[loop_index] := loop_index;
+        loop_index := loop_index + 1
+    end
+end;

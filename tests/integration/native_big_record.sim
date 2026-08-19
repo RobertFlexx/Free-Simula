@@ -1,0 +1,26 @@
+type BigTriple = record
+    a: integer;
+    b: integer;
+    c: integer
+end;
+
+BigTriple function Bump(BigTriple value);
+begin
+    value.a := value.a + 1;
+    value.b := value.b + 2;
+    value.c := value.c + 3;
+    return value
+end;
+
+program NativeBigRecord;
+begin
+    BigTriple value;
+    value.a := 100;
+    value.b := 200;
+    value.c := 300;
+    value := Bump(value);
+    assert(value.a = 101);
+    assert(value.b = 202);
+    assert(value.c = 303);
+    exit(0)
+end;

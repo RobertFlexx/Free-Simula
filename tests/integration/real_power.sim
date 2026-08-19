@@ -1,0 +1,7 @@
+program RealPower;
+begin
+    real result;
+    result := 2.0 ** 10;
+    assert(result = 1024.0);
+    exit(0)
+end;

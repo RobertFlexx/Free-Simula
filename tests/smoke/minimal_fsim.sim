@@ -1,0 +1,7 @@
+program MinimalFSim;
+begin
+    integer answer;
+    answer := 40 + 2;
+    assert(answer = 42);
+    exit(0)
+end;

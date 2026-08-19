@@ -1,0 +1,4 @@
+program ChannelFailure;
+begin
+    channel(integer) values
+end;
