@@ -20,6 +20,8 @@ Free Simula is also not intended to be Simula 67 frozen in time. Historical faci
 
 The compiler also provides a separate `-std=simula67` mode for historical Standard Simula 67 source.
 
+> Not all historical Simula 67 source will compile unchanged. The compatibility profile is intended to provide substantial practical coverage of    Standard Simula 67 rather than claim perfect compatibility with every historical implementation.
+
 `fsim` has its own x86-64 machine-code and ELF backend. Ordinary native output does not pass through generated C, GCC, Clang, LLVM, `as`, or `ld`.
 
 ## Where this came from
