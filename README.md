@@ -163,6 +163,8 @@ favoriteBook :-
 favoriteBook.printDetails;
 ```
 
+The historical object model remains usable directly; Free Simula's newer facilities are layered around it rather than replacing it.
+
 And Free Simula can build on that same language with modern facilities:
 
 ```simula
