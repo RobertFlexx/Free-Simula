@@ -307,3 +307,7 @@ Free Simula has been worked on by me and several friends, some of whom prefer to
 **Anonymous 1** — software developer  
 **Anonymous 2** — software developer and assistant lead  
 **Anonymous 3** — debugging and software development
+
+## Extras
+
+**WE** need help to add Simula recognition to github linguist. **ANYONE** can help
