@@ -18,7 +18,7 @@ Around that foundation, Free Simula adds facilities that make sense on a modern 
 
 Free Simula is also not intended to be Simula 67 frozen in time. Historical facilities that depend heavily on the computing environment of the original language may be replaced or supplemented with modern mechanisms while retaining the language's original structure and style.
 
-The compiler also provides a separate `-std=simula67` mode for historical Standard Simula 67 source.
+The compiler also provides a separate -std=simula67 compatibility profile for historical Standard Simula 67 source.
 
 > Not all historical Simula 67 source will compile unchanged. The compatibility profile is intended to provide substantial practical coverage of    Standard Simula 67 rather than claim perfect compatibility with every historical implementation.
 
