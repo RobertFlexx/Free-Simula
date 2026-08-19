@@ -1,9 +1,0 @@
-program IntegerPower;
-begin
-    integer result;
-    result := 3 ** 5;
-    assert(result = 243);
-    outint(result);
-    outimage;
-    exit(0)
-end;

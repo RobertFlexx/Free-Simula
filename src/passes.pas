@@ -220,7 +220,7 @@ begin
     irThreadSpawn, irThreadJoin, irThreadCancel,
     irFutureAwait, irChannelSend, irChannelReceive,
     irMutexLock, irMutexUnlock, irMemoryFence,
-    irProcessDetach, irProcessResume, irProcessActivate,
+    irProcessDetach, irProcessCall, irProcessResume, irProcessActivate,
     irProcessReactivate, irProcessDelay, irProcessHold,
     irProcessPassivate:
       Result := True;

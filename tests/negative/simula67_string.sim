@@ -1,6 +1,0 @@
-program VintageString;
-begin
-    string modern;
-    modern := "not historical";
-    exit(0)
-end;

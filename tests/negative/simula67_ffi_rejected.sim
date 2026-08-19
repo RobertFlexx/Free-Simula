@@ -1,5 +1,0 @@
-foreign c from "libc.so.6" begin
-    function puts(value: c_string): c_int = "puts";
-end;
-begin
-end;

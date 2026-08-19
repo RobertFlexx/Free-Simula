@@ -16,6 +16,7 @@ const
   LINUX_SYS_CLONE = 56;
   LINUX_SYS_EXIT = 60;
   LINUX_SYS_FUTEX = 202;
+  LINUX_SYS_CLOCK_GETTIME = 228;
 
   LINUX_FUTEX_WAIT_PRIVATE = 128;
   LINUX_FUTEX_WAKE_PRIVATE = 129;
@@ -32,7 +33,13 @@ const
   FSIM_HEAP_SCANNED = 4;
   FSIM_HEAP_LARGE = 8;
   FSIM_HEAP_PINNED = 16;
-  FSIM_GC_ARENA_TRIGGER = 16;
+  FSIM_HEAP_MAGIC_HI = $4653494D; { "FSIM" }
+  FSIM_HEAP_MAGIC = $4653494D00000000;
+  FSIM_GC_INITIAL_ARENA_TRIGGER = 64;
+  FSIM_GC_MIN_ARENA_TRIGGER = 32;
+  FSIM_GC_MAX_ARENA_TRIGGER = 512;
+  FSIM_GC_SMALL_ARENA_BYTES = 1024 * 1024;
+  FSIM_GC_ARENA_META_SIZE = 16;
   FSIM_HEAP_FREE_CLASSES = 12;
 
   LINUX_PROT_READ = 1;
@@ -81,11 +88,21 @@ type
     AllocatorEnd: Int32;
     AllocatorHead: Int32;
     AllocatorFreeHead: Int32;
+    AllocatorArenaHead: Int32;
+    AllocatorArenaCurrent: Int32;
     GCStackTop: Int32;
     GCArenasSinceCollection: Int32;
+    GCNextArenaTrigger: Int32;
+    GCMinAddress: Int32;
+    GCMaxAddress: Int32;
+    GCMarkHead: Int32;
     GCCollections: Int32;
     GCLiveBytes: Int32;
     GCReclaimedBytes: Int32;
+    GCStartNS: Int32;
+    GCLastPauseNS: Int32;
+    GCMaxPauseNS: Int32;
+    GCTotalPauseNS: Int32;
     GCTaskHead: Int32;
     CriticalLock: Int32;
     S67: TS67NativeDataOffsets;
@@ -111,6 +128,9 @@ type
     GCLiveBytes: Int32;
     GCReclaimedBytes: Int32;
     GCCollectionCount: Int32;
+    GCLastPauseNS: Int32;
+    GCMaxPauseNS: Int32;
+    GCTotalPauseNS: Int32;
     MemoryCopy: Int32;
     MemoryZero: Int32;
     StringConcat: Int32;
@@ -211,15 +231,35 @@ begin
   BufferAppendQWord(WritableData, 0);
   BufferAppendQWord(WritableData, 0);
   BufferAppendQWord(WritableData, 0);
+  Offsets.AllocatorArenaHead := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.AllocatorArenaCurrent := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
   Offsets.GCStackTop := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
   Offsets.GCArenasSinceCollection := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCNextArenaTrigger := WritableData.Count;
+  BufferAppendQWord(WritableData, FSIM_GC_INITIAL_ARENA_TRIGGER);
+  Offsets.GCMinAddress := WritableData.Count;
+  BufferAppendQWord(WritableData, High(QWord));
+  Offsets.GCMaxAddress := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCMarkHead := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
   Offsets.GCCollections := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
   Offsets.GCLiveBytes := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
   Offsets.GCReclaimedBytes := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCStartNS := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCLastPauseNS := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCMaxPauseNS := WritableData.Count;
+  BufferAppendQWord(WritableData, 0);
+  Offsets.GCTotalPauseNS := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
   Offsets.GCTaskHead := WritableData.Count;
   BufferAppendQWord(WritableData, 0);
@@ -249,6 +289,9 @@ begin
   Labels.GCLiveBytes := X64NewLabel(Assembler);
   Labels.GCReclaimedBytes := X64NewLabel(Assembler);
   Labels.GCCollectionCount := X64NewLabel(Assembler);
+  Labels.GCLastPauseNS := X64NewLabel(Assembler);
+  Labels.GCMaxPauseNS := X64NewLabel(Assembler);
+  Labels.GCTotalPauseNS := X64NewLabel(Assembler);
   Labels.MemoryCopy := X64NewLabel(Assembler);
   Labels.MemoryZero := X64NewLabel(Assembler);
   Labels.StringConcat := X64NewLabel(Assembler);
@@ -605,18 +648,18 @@ procedure EmitAllocate(var A: TX64Assembler; const L: TRuntimeLabels;
   const D: TRuntimeDataOffsets);
 const
   SMALL_LIMIT = 32768;
-  ARENA_BYTES = 1024 * 1024;
+  ARENA_BYTES = FSIM_GC_SMALL_ARENA_BYTES;
 var
-  NoAutoGC, SmallPath, ClassLoop, ClassReady, FreeRetry, NeedBump,
-  ZeroLoop, ZeroDone, FastRetry, NeedRefill, LockRetry, LockHeld,
-  RefillArena, RefillSuccess, ReleaseAndRetry, FreshLinkRetry,
-  FreshReady, LargeMap, LargeSuccess, LargeLinkRetry, LargeReady: Int32;
+  SmallPath, ClassLoop, ClassReady, FreeRetry, NeedBump,
+  ZeroLoop, ZeroDone, FastRetry, NeedRefill, RefillGCReady,
+  LockRetry, LockHeld, RefillArena, RefillSuccess, ReleaseAndRetry,
+  FreshLinkRetry, FreshReady, UsedEndRetry, UsedEndDone,
+  LargeMap, LargeGCReady, LargeSuccess, LargeLinkRetry, LargeReady: Int32;
 begin
-  { The hot path remains a slab bump-pointer CAS.  GC-reclaimed small blocks
-    are kept in twelve power-of-two free lists (16 .. 32768 bytes), so reuse
-    is also lock-free and never calls the kernel.  Large objects are separate
-    mappings and can be returned to Linux by the collector. }
-  NoAutoGC := X64NewLabel(A);
+  { Small allocations use a power-of-two free list or a lock-free bump pointer.
+    Automatic GC is polled only at allocator refill/large-map boundaries, not
+    on every allocation.  This keeps the normal game/application hot path to
+    local arithmetic, a free-list CAS, or a bump-pointer CAS. }
   SmallPath := X64NewLabel(A);
   ClassLoop := X64NewLabel(A);
   ClassReady := X64NewLabel(A);
@@ -626,6 +669,7 @@ begin
   ZeroDone := X64NewLabel(A);
   FastRetry := X64NewLabel(A);
   NeedRefill := X64NewLabel(A);
+  RefillGCReady := X64NewLabel(A);
   LockRetry := X64NewLabel(A);
   LockHeld := X64NewLabel(A);
   RefillArena := X64NewLabel(A);
@@ -633,23 +677,15 @@ begin
   ReleaseAndRetry := X64NewLabel(A);
   FreshLinkRetry := X64NewLabel(A);
   FreshReady := X64NewLabel(A);
+  UsedEndRetry := X64NewLabel(A);
+  UsedEndDone := X64NewLabel(A);
   LargeMap := X64NewLabel(A);
+  LargeGCReady := X64NewLabel(A);
   LargeSuccess := X64NewLabel(A);
   LargeLinkRetry := X64NewLabel(A);
   LargeReady := X64NewLabel(A);
 
   X64BindLabel(A, L.Allocate);
-  { Collection is amortized by arena creation rather than every byte
-    allocated.  If workers are alive GCCollect simply declines the cycle. }
-  X64LeaRegRipWritable(A, xrR8, D.GCArenasSinceCollection, 0);
-  X64MovRegMemBaseDisp(A, xrRAX, xrR8, 0);
-  X64CmpRegImm32(A, xrRAX, FSIM_GC_ARENA_TRIGGER);
-  X64JumpCondition(A, xcBelow, NoAutoGC);
-  X64PushReg(A, xrRDI);
-  X64Call(A, L.GCCollect);
-  X64PopReg(A, xrRDI);
-  X64BindLabel(A, NoAutoGC);
-
   X64CmpRegImm32(A, xrRDI, 16);
   X64JumpCondition(A, xcAboveEqual, FreshReady);
   X64MovRegImm64(A, xrRDI, 16);
@@ -659,10 +695,9 @@ begin
   X64Jump(A, LargeMap);
 
   X64BindLabel(A, SmallPath);
-  { Round small allocations to a power of two.  This makes reclaimed blocks
-    reusable without a global search or allocator lock. }
+  { Round the requested payload to one of 12 power-of-two classes. }
   X64MovRegImm64(A, xrRSI, 16);
-  X64XorRegReg(A, xrRDX, xrRDX); { size-class index }
+  X64XorRegReg(A, xrRDX, xrRDX); { class index }
   X64BindLabel(A, ClassLoop);
   X64CmpRegReg(A, xrRSI, xrRDI);
   X64JumpCondition(A, xcAboveEqual, ClassReady);
@@ -671,7 +706,8 @@ begin
   X64Jump(A, ClassLoop);
   X64BindLabel(A, ClassReady);
 
-  { Try the matching free-list first. }
+  { Reclaimed blocks are reused without a kernel call or global allocator
+    lock.  Header +8 is the free-list link while the block is unallocated. }
   X64LeaRegRipWritable(A, xrR9, D.AllocatorFreeHead, 0);
   X64ShlRegImm8(A, xrRDX, 3);
   X64AddRegReg(A, xrR9, xrRDX);
@@ -682,14 +718,13 @@ begin
   X64MovRegMemBaseDisp(A, xrRCX, xrRAX, 8);
   X64LockCmpXchgMemBaseDispReg(A, xrR9, 0, xrRCX);
   X64JumpCondition(A, xcNotEqual, FreeRetry);
-  { rax is the popped allocation header. }
   X64MovRegReg(A, xrR8, xrRAX);
-  X64MovRegImm64(A, xrRCX, FSIM_HEAP_ALLOCATED);
+  X64MovRegImm64(A, xrRCX, FSIM_HEAP_MAGIC or FSIM_HEAP_ALLOCATED);
   X64MovMemBaseDispReg(A, xrR8, 24, xrRCX);
   X64XorRegReg(A, xrRCX, xrRCX);
   X64MovMemBaseDispReg(A, xrR8, 8, xrRCX);
-  { Recycled storage is cleared so allocation has the same semantics as
-    freshly-mapped memory and stale references cannot keep objects alive. }
+  { Clear recycled storage.  Apart from deterministic zero-initialization this
+    also prevents stale conservative references from extending lifetimes. }
   X64LeaRegBaseDisp(A, xrRDX, xrR8, FSIM_HEAP_HEADER_SIZE);
   X64MovRegReg(A, xrRCX, xrRSI);
   X64ShrRegImm8(A, xrRCX, 3);
@@ -721,15 +756,35 @@ begin
   X64JumpCondition(A, xcAbove, NeedRefill);
   X64LockCmpXchgMemBaseDispReg(A, xrR9, 0, xrRCX);
   X64JumpCondition(A, xcNotEqual, FastRetry);
-  { rax is the fresh header. Restore payload size from reservation bytes. }
-  X64MovRegReg(A, xrR8, xrRAX);
-  X64SubRegImm32(A, xrRSI, FSIM_HEAP_HEADER_SIZE);
+
+  { Publish the highest committed byte in the current arena.  Allocation can
+    be concurrent even though tracing itself is quiescent, so this is an
+    atomic max rather than a plain store. }
+  X64MovRegReg(A, xrR11, xrRCX); { committed cursor }
+  X64LeaRegRipWritable(A, xrR10, D.AllocatorArenaCurrent, 0);
+  X64MovRegMemBaseDisp(A, xrR10, xrR10, 0);
+  X64BindLabel(A, UsedEndRetry);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR10, 8);
+  X64CmpRegReg(A, xrRAX, xrR11);
+  X64JumpCondition(A, xcAboveEqual, UsedEndDone);
+  X64MovRegReg(A, xrRCX, xrR11);
+  X64LockCmpXchgMemBaseDispReg(A, xrR10, 8, xrRCX);
+  X64JumpCondition(A, xcNotEqual, UsedEndRetry);
+  X64BindLabel(A, UsedEndDone);
+
+  { The cmpxchg loop changed rax.  Recover the fresh header from the committed
+    cursor and reservation size. }
+  X64MovRegReg(A, xrR8, xrR11);
+  X64SubRegReg(A, xrR8, xrRSI);
+  X64SubRegImm32(A, xrRSI, FSIM_HEAP_HEADER_SIZE); { payload bytes }
   X64XorRegReg(A, xrRCX, xrRCX);
   X64MovMemBaseDispReg(A, xrR8, 8, xrRCX);
   X64MovMemBaseDispReg(A, xrR8, 16, xrRSI);
-  X64MovRegImm64(A, xrRCX, FSIM_HEAP_ALLOCATED);
+  X64MovRegImm64(A, xrRCX, FSIM_HEAP_MAGIC or FSIM_HEAP_ALLOCATED);
   X64MovMemBaseDispReg(A, xrR8, 24, xrRCX);
-  { Every allocation is on an intrusive list used only by the collector. }
+
+  { The all-allocation list is retained for sweeping, large maps and pinning.
+    Normal mark lookup no longer linearly probes this list for small objects. }
   X64LeaRegRipWritable(A, xrR9, D.AllocatorHead, 0);
   X64BindLabel(A, FreshLinkRetry);
   X64MovRegMemBaseDisp(A, xrRAX, xrR9, 0);
@@ -741,7 +796,18 @@ begin
   X64Ret(A);
 
   X64BindLabel(A, NeedRefill);
-  { rsi still includes the header. }
+  { Poll automatic GC only at a natural allocator boundary. }
+  X64LeaRegRipWritable(A, xrR8, D.GCArenasSinceCollection, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR8, 0);
+  X64LeaRegRipWritable(A, xrR10, D.GCNextArenaTrigger, 0);
+  X64MovRegMemBaseDisp(A, xrR10, xrR10, 0);
+  X64CmpRegReg(A, xrRAX, xrR10);
+  X64JumpCondition(A, xcBelow, RefillGCReady);
+  X64PushReg(A, xrRSI);
+  X64Call(A, L.GCCollect);
+  X64PopReg(A, xrRSI);
+  X64BindLabel(A, RefillGCReady);
+
   X64LeaRegRipWritable(A, xrR8, D.AllocatorLock, 0);
   X64BindLabel(A, LockRetry);
   X64XorRegReg(A, xrRAX, xrRAX);
@@ -752,7 +818,7 @@ begin
   X64Jump(A, LockRetry);
 
   X64BindLabel(A, LockHeld);
-  { Another allocator may have refilled while we waited. }
+  { Another allocator may have refilled while this thread waited. }
   X64LeaRegRipWritable(A, xrR9, D.AllocatorCursor, 0);
   X64LeaRegRipWritable(A, xrR10, D.AllocatorEnd, 0);
   X64MovRegMemBaseDisp(A, xrRAX, xrR9, 0);
@@ -783,10 +849,23 @@ begin
   X64Jump(A, L.PanicAllocation);
 
   X64BindLabel(A, RefillSuccess);
-  X64MovRegReg(A, xrR11, xrRAX);
+  X64MovRegReg(A, xrR11, xrRAX); { arena base }
+  { Each arena begins with next-arena and committed-used-end. }
+  X64LeaRegRipWritable(A, xrR8, D.AllocatorArenaHead, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR8, 0);
+  X64MovMemBaseDispReg(A, xrR11, 0, xrRCX);
+  X64MovRegReg(A, xrRCX, xrR11);
+  X64AddRegImm32(A, xrRCX, FSIM_GC_ARENA_META_SIZE);
+  X64MovMemBaseDispReg(A, xrR11, 8, xrRCX);
+  X64MovMemBaseDispReg(A, xrR8, 0, xrR11);
+  X64LeaRegRipWritable(A, xrR8, D.AllocatorArenaCurrent, 0);
+  X64MovMemBaseDispReg(A, xrR8, 0, xrR11);
+
   X64LeaRegRipWritable(A, xrR9, D.AllocatorCursor, 0);
   X64LeaRegRipWritable(A, xrR10, D.AllocatorEnd, 0);
-  X64MovMemBaseDispReg(A, xrR9, 0, xrR11);
+  X64MovRegReg(A, xrRCX, xrR11);
+  X64AddRegImm32(A, xrRCX, FSIM_GC_ARENA_META_SIZE);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRCX);
   X64MovRegReg(A, xrRCX, xrR11);
   X64AddRegImm32(A, xrRCX, ARENA_BYTES);
   X64MovMemBaseDispReg(A, xrR10, 0, xrRCX);
@@ -805,6 +884,18 @@ begin
   X64Jump(A, FastRetry);
 
   X64BindLabel(A, LargeMap);
+  { Large maps also contribute to collection pressure. }
+  X64LeaRegRipWritable(A, xrR8, D.GCArenasSinceCollection, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR8, 0);
+  X64LeaRegRipWritable(A, xrR10, D.GCNextArenaTrigger, 0);
+  X64MovRegMemBaseDisp(A, xrR10, xrR10, 0);
+  X64CmpRegReg(A, xrRAX, xrR10);
+  X64JumpCondition(A, xcBelow, LargeGCReady);
+  X64PushReg(A, xrRDI);
+  X64Call(A, L.GCCollect);
+  X64PopReg(A, xrRDI);
+  X64BindLabel(A, LargeGCReady);
+
   X64AddRegImm32(A, xrRDI, 15);
   X64AndRegImm32(A, xrRDI, -16);
   X64PushReg(A, xrRDI); { payload bytes }
@@ -827,7 +918,8 @@ begin
   X64XorRegReg(A, xrRCX, xrRCX);
   X64MovMemBaseDispReg(A, xrR8, 8, xrRCX);
   X64MovMemBaseDispReg(A, xrR8, 16, xrRSI);
-  X64MovRegImm64(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
+  X64MovRegImm64(A, xrRCX,
+    FSIM_HEAP_MAGIC or FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
   X64MovMemBaseDispReg(A, xrR8, 24, xrRCX);
   X64LeaRegRipWritable(A, xrR9, D.AllocatorHead, 0);
   X64BindLabel(A, LargeLinkRetry);
@@ -845,6 +937,7 @@ begin
   X64Ret(A);
 end;
 
+
 procedure EmitFree(var A: TX64Assembler; const L: TRuntimeLabels);
 begin
   { Internal raw mapping release.  Managed user allocations are reclaimed by
@@ -858,43 +951,171 @@ end;
 procedure EmitGCMarkCandidate(var A: TX64Assembler; const L: TRuntimeLabels;
   const D: TRuntimeDataOffsets);
 var
-  LoopLabel, NextLabel, DoneLabel, FoundLabel: Int32;
+  ArenaLoop, ArenaNext, ArenaFound, ArenaExactFallback, ArenaScan, MarkSmall,
+  LargeStart, LargeLoop, LargeAdvance, MarkLarge, MarkCommon,
+  AlreadyMarked, DoneLabel: Int32;
 begin
-  { rdi may be an exact or interior managed pointer.  Interior recognition is
-    intentional: strict SIMULA text frames and FFI pointer arithmetic can
-    retain a managed mapping through a pointer into its payload. }
-  LoopLabel := X64NewLabel(A);
-  NextLabel := X64NewLabel(A);
+  { rdi may be an exact or interior managed pointer.  Fast reject most words
+    with one heap-range test, then locate small objects by arena.  The global
+    allocation list is consulted only for uncommon large mmap allocations. }
+  ArenaLoop := X64NewLabel(A);
+  ArenaNext := X64NewLabel(A);
+  ArenaFound := X64NewLabel(A);
+  ArenaExactFallback := X64NewLabel(A);
+  ArenaScan := X64NewLabel(A);
+  MarkSmall := X64NewLabel(A);
+  LargeStart := X64NewLabel(A);
+  LargeLoop := X64NewLabel(A);
+  LargeAdvance := X64NewLabel(A);
+  MarkLarge := X64NewLabel(A);
+  MarkCommon := X64NewLabel(A);
+  AlreadyMarked := X64NewLabel(A);
   DoneLabel := X64NewLabel(A);
-  FoundLabel := X64NewLabel(A);
+
   X64BindLabel(A, L.GCMarkCandidate);
+  X64LeaRegRipWritable(A, xrR8, D.GCMinAddress, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR8, 0);
+  X64CmpRegReg(A, xrRDI, xrRAX);
+  X64JumpCondition(A, xcBelow, DoneLabel);
+  X64LeaRegRipWritable(A, xrR8, D.GCMaxAddress, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR8, 0);
+  X64CmpRegReg(A, xrRDI, xrRAX);
+  X64JumpCondition(A, xcAboveEqual, DoneLabel);
+
+  { Small allocations live in linked 1 MiB arenas. }
+  X64LeaRegRipWritable(A, xrR8, D.AllocatorArenaHead, 0);
+  X64MovRegMemBaseDisp(A, xrR8, xrR8, 0);
+  X64BindLabel(A, ArenaLoop);
+  X64TestRegReg(A, xrR8, xrR8);
+  X64JumpCondition(A, xcEqual, LargeStart);
+  X64MovRegReg(A, xrR9, xrR8);
+  X64AddRegImm32(A, xrR9, FSIM_GC_ARENA_META_SIZE);
+  X64CmpRegReg(A, xrRDI, xrR9);
+  X64JumpCondition(A, xcBelow, ArenaNext);
+  X64MovRegReg(A, xrR10, xrR8);
+  X64AddRegImm32(A, xrR10, FSIM_GC_SMALL_ARENA_BYTES);
+  X64CmpRegReg(A, xrRDI, xrR10);
+  X64JumpCondition(A, xcBelow, ArenaFound);
+  X64BindLabel(A, ArenaNext);
+  X64MovRegMemBaseDisp(A, xrR8, xrR8, 0);
+  X64Jump(A, ArenaLoop);
+
+  X64BindLabel(A, ArenaFound);
+  { r9 is the first physical allocation header and [arena+8] is the highest
+    committed cursor.  Try the overwhelmingly common exact-payload case in
+    O(1) before the conservative interior-pointer fallback. }
+  X64MovRegMemBaseDisp(A, xrR10, xrR8, 8);
+  X64MovRegReg(A, xrRCX, xrR9);
+  X64AddRegImm32(A, xrRCX, FSIM_HEAP_HEADER_SIZE);
+  X64CmpRegReg(A, xrRDI, xrRCX);
+  X64JumpCondition(A, xcBelow, DoneLabel);
+  X64CmpRegReg(A, xrRDI, xrR10);
+  X64JumpCondition(A, xcAboveEqual, DoneLabel);
+  X64MovRegReg(A, xrR11, xrRDI);
+  X64SubRegImm32(A, xrR11, FSIM_HEAP_HEADER_SIZE);
+  X64MovRegReg(A, xrRCX, xrR11);
+  X64AndRegImm32(A, xrRCX, 15);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcNotEqual, ArenaExactFallback);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR11, 24);
+  X64MovRegReg(A, xrRDX, xrRAX);
+  X64ShrRegImm8(A, xrRDX, 32);
+  X64CmpRegImm32(A, xrRDX, FSIM_HEAP_MAGIC_HI);
+  X64JumpCondition(A, xcNotEqual, ArenaExactFallback);
+  X64MovRegReg(A, xrRCX, xrRAX);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcEqual, ArenaExactFallback);
+  X64MovRegMemBaseDisp(A, xrRDX, xrR11, 16);
+  X64CmpRegImm32(A, xrRDX, 16);
+  X64JumpCondition(A, xcBelow, ArenaExactFallback);
+  X64CmpRegImm32(A, xrRDX, 32768);
+  X64JumpCondition(A, xcAbove, ArenaExactFallback);
+  { Small classes are powers of two; reject random payload words that merely
+    resemble our cookie before using the candidate as a header. }
+  X64MovRegReg(A, xrRCX, xrRDX);
+  X64SubRegImm32(A, xrRCX, 1);
+  X64AndRegReg(A, xrRCX, xrRDX);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcNotEqual, ArenaExactFallback);
+  X64MovRegReg(A, xrRCX, xrR11);
+  X64AddRegImm32(A, xrRCX, FSIM_HEAP_HEADER_SIZE);
+  X64AddRegReg(A, xrRCX, xrRDX);
+  X64CmpRegReg(A, xrRCX, xrR10);
+  X64JumpCondition(A, xcAbove, ArenaExactFallback);
+  X64MovRegReg(A, xrR9, xrR11);
+  X64Jump(A, MarkCommon);
+
+  { Interior pointers remain supported.  Only this uncommon path walks the
+    physical headers in the one arena containing the candidate. }
+  X64BindLabel(A, ArenaExactFallback);
+  X64BindLabel(A, ArenaScan);
+  X64CmpRegReg(A, xrR9, xrR10);
+  X64JumpCondition(A, xcAboveEqual, DoneLabel);
+  X64LeaRegBaseDisp(A, xrRCX, xrR9, FSIM_HEAP_HEADER_SIZE);
+  X64CmpRegReg(A, xrRDI, xrRCX);
+  X64JumpCondition(A, xcBelow, DoneLabel);
+  X64MovRegMemBaseDisp(A, xrRDX, xrR9, 16);
+  X64AddRegReg(A, xrRDX, xrRCX); { payload end / next physical header }
+  X64CmpRegReg(A, xrRDI, xrRDX);
+  X64JumpCondition(A, xcBelow, MarkSmall);
+  X64MovRegReg(A, xrR9, xrRDX);
+  X64Jump(A, ArenaScan);
+
+  X64BindLabel(A, MarkSmall);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR9, 24);
+  X64MovRegReg(A, xrRCX, xrRAX);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcEqual, DoneLabel);
+  X64Jump(A, MarkCommon);
+
+  { Large objects are rare and individually mmap'd. }
+  X64BindLabel(A, LargeStart);
   X64LeaRegRipWritable(A, xrR8, D.AllocatorHead, 0);
   X64MovRegMemBaseDisp(A, xrR8, xrR8, 0);
-  X64BindLabel(A, LoopLabel);
+  X64BindLabel(A, LargeLoop);
   X64TestRegReg(A, xrR8, xrR8);
   X64JumpCondition(A, xcEqual, DoneLabel);
   X64MovRegMemBaseDisp(A, xrRAX, xrR8, 24);
   X64MovRegReg(A, xrRCX, xrRAX);
-  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED);
-  X64TestRegReg(A, xrRCX, xrRCX);
-  X64JumpCondition(A, xcEqual, NextLabel);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
+  X64CmpRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
+  X64JumpCondition(A, xcNotEqual, LargeAdvance);
   X64LeaRegBaseDisp(A, xrR9, xrR8, FSIM_HEAP_HEADER_SIZE);
   X64CmpRegReg(A, xrRDI, xrR9);
-  X64JumpCondition(A, xcBelow, NextLabel);
+  X64JumpCondition(A, xcBelow, LargeAdvance);
   X64MovRegMemBaseDisp(A, xrR10, xrR8, 16);
   X64AddRegReg(A, xrR10, xrR9);
   X64CmpRegReg(A, xrRDI, xrR10);
-  X64JumpCondition(A, xcBelow, FoundLabel);
-  X64BindLabel(A, NextLabel);
+  X64JumpCondition(A, xcBelow, MarkLarge);
+  X64BindLabel(A, LargeAdvance);
   X64MovRegMemBaseDisp(A, xrR8, xrR8, 0);
-  X64Jump(A, LoopLabel);
-  X64BindLabel(A, FoundLabel);
+  X64Jump(A, LargeLoop);
+
+  X64BindLabel(A, MarkLarge);
+  X64MovRegReg(A, xrR9, xrR8);
+
+  X64BindLabel(A, MarkCommon);
+  { Each newly reached allocation is queued once.  Header +8 is a free-list
+    link only while a small block is dead; for allocated blocks it is tracing
+    scratch space. }
+  X64MovRegReg(A, xrRCX, xrRAX);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_MARKED);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcNotEqual, AlreadyMarked);
   X64MovRegImm64(A, xrRCX, FSIM_HEAP_MARKED);
   X64OrRegReg(A, xrRAX, xrRCX);
-  X64MovMemBaseDispReg(A, xrR8, 24, xrRAX);
+  X64MovMemBaseDispReg(A, xrR9, 24, xrRAX);
+  X64LeaRegRipWritable(A, xrR10, D.GCMarkHead, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR10, 0);
+  X64MovMemBaseDispReg(A, xrR9, 8, xrRCX);
+  X64MovMemBaseDispReg(A, xrR10, 0, xrR9);
+  X64BindLabel(A, AlreadyMarked);
   X64BindLabel(A, DoneLabel);
   X64Ret(A);
 end;
+
 
 procedure EmitGCPinControl(var A: TX64Assembler; const L: TRuntimeLabels;
   const D: TRuntimeDataOffsets);
@@ -977,24 +1198,36 @@ end;
 procedure EmitGCCollect(var A: TX64Assembler; const L: TRuntimeLabels;
   const D: TRuntimeDataOffsets; WritableRootOffset, WritableRootBytes: Int32);
 var
-  TaskLoop, TaskDone, AbortLabel, ClearLoop, ClearNext, RootStackLoop,
-  RootStackDone, RootDataLoop, RootDataDone, ClosureAgain, ClosureLoop,
-  ClosureNext, ScanLoop, ScanDone, ClosureDone, SweepLoop, SweepLive,
-  SweepDeadSmall, SweepDeadLarge, SweepUnallocated, SweepNext, SweepFinish,
-  ClassLoop, ClassReady, LargeHasPrev, ReleaseLarge: Int32;
+  TaskLoop, TaskDone, AbortLabel,
+  BoundsArenaLoop, BoundsArenaAdvance, BoundsLargeStart, BoundsLargeLoop,
+  BoundsLargeAdvance, BoundsStore, BoundsMinArenaOk, BoundsMaxArenaOk,
+  BoundsMinLargeOk, BoundsMaxLargeOk,
+  ClearLoop, ClearNext, RootStackStart, RootStackLoop, RootDataStart,
+  RootDataLoop, ClosureLoop, ScanLoop, ScanDone, ClosureDone,
+  SweepLoop, SweepLive, SweepDeadSmall, SweepDeadLarge, SweepUnallocated,
+  SweepNext, SweepFinish, ClassLoop, ClassReady, LargeHasPrev, ReleaseLarge,
+  TriggerMinOk, TriggerMaxOk, PauseMaxDone: Int32;
 begin
   TaskLoop := X64NewLabel(A);
   TaskDone := X64NewLabel(A);
   AbortLabel := X64NewLabel(A);
+  BoundsArenaLoop := X64NewLabel(A);
+  BoundsArenaAdvance := X64NewLabel(A);
+  BoundsLargeStart := X64NewLabel(A);
+  BoundsLargeLoop := X64NewLabel(A);
+  BoundsLargeAdvance := X64NewLabel(A);
+  BoundsStore := X64NewLabel(A);
+  BoundsMinArenaOk := X64NewLabel(A);
+  BoundsMaxArenaOk := X64NewLabel(A);
+  BoundsMinLargeOk := X64NewLabel(A);
+  BoundsMaxLargeOk := X64NewLabel(A);
   ClearLoop := X64NewLabel(A);
   ClearNext := X64NewLabel(A);
+  RootStackStart := X64NewLabel(A);
   RootStackLoop := X64NewLabel(A);
-  RootStackDone := X64NewLabel(A);
+  RootDataStart := X64NewLabel(A);
   RootDataLoop := X64NewLabel(A);
-  RootDataDone := X64NewLabel(A);
-  ClosureAgain := X64NewLabel(A);
   ClosureLoop := X64NewLabel(A);
-  ClosureNext := X64NewLabel(A);
   ScanLoop := X64NewLabel(A);
   ScanDone := X64NewLabel(A);
   ClosureDone := X64NewLabel(A);
@@ -1009,6 +1242,9 @@ begin
   ClassReady := X64NewLabel(A);
   LargeHasPrev := X64NewLabel(A);
   ReleaseLarge := X64NewLabel(A);
+  TriggerMinOk := X64NewLabel(A);
+  TriggerMaxOk := X64NewLabel(A);
+  PauseMaxDone := X64NewLabel(A);
 
   X64BindLabel(A, L.GCCollect);
   X64PushReg(A, xrRBX);
@@ -1017,99 +1253,176 @@ begin
   X64PushReg(A, xrR14);
   X64PushReg(A, xrR15);
 
-  { Collection is quiescent with respect to fsim native tasks.  Allocation
-    itself remains concurrent; a collection simply skips if any clone still
-    has a non-zero child TID. }
+  { Native fsim workers use independent stacks.  Until stack-map/handshake
+    support exists, collection is deliberately quiescent: if a worker is live
+    we postpone rather than scanning an unstable foreign stack. }
   X64LeaRegRipWritable(A, xrR12, D.GCTaskHead, 0);
   X64MovRegMemBaseDisp(A, xrR13, xrR12, 0);
   X64BindLabel(A, TaskLoop);
   X64TestRegReg(A, xrR13, xrR13);
   X64JumpCondition(A, xcEqual, TaskDone);
-  X64MovRegMemBaseDisp(A, xrRAX, xrR13,
-    FSIM_HEAP_HEADER_SIZE + 16);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR13, FSIM_HEAP_HEADER_SIZE + 16);
   X64TestRegReg(A, xrRAX, xrRAX);
   X64JumpCondition(A, xcNotEqual, AbortLabel);
   X64MovRegMemBaseDisp(A, xrR13, xrR13, 8);
   X64Jump(A, TaskLoop);
+
   X64BindLabel(A, TaskDone);
   X64XorRegReg(A, xrRAX, xrRAX);
   X64MovMemBaseDispReg(A, xrR12, 0, xrRAX); { retire completed task list }
 
-  { Clear transient mark bits. }
+  { Timestamp the real collection pause.  Skipped worker-busy attempts never
+    enter this region, so the exposed telemetry measures actual GC work. }
+  X64SubRegImm32(A, xrRSP, 16);
+  X64MovRegImm64(A, xrRDI, 1); { CLOCK_MONOTONIC }
+  X64MovRegReg(A, xrRSI, xrRSP);
+  X64MovRegImm64(A, xrRAX, LINUX_SYS_CLOCK_GETTIME);
+  X64Syscall(A);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRSP, 0);
+  X64IMulRegRegImm32(A, xrRAX, xrRAX, 1000000000);
+  X64MovRegMemBaseDisp(A, xrRCX, xrRSP, 8);
+  X64AddRegReg(A, xrRAX, xrRCX);
+  X64AddRegImm32(A, xrRSP, 16);
+  X64LeaRegRipWritable(A, xrR9, D.GCStartNS, 0);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
+
+  { Compute conservative address bounds once.  Nearly every word examined by
+    the tracer is not a heap pointer; min/max rejects those before arena/list
+    lookup. }
+  X64MovRegImm64(A, xrR14, High(QWord));
+  X64XorRegReg(A, xrR15, xrR15);
+  X64LeaRegRipWritable(A, xrR12, D.AllocatorArenaHead, 0);
+  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
+  X64BindLabel(A, BoundsArenaLoop);
+  X64TestRegReg(A, xrR12, xrR12);
+  X64JumpCondition(A, xcEqual, BoundsLargeStart);
+  X64MovRegReg(A, xrRAX, xrR12);
+  X64AddRegImm32(A, xrRAX, FSIM_GC_ARENA_META_SIZE);
+  X64CmpRegReg(A, xrR14, xrRAX);
+  X64JumpCondition(A, xcBelowEqual, BoundsMinArenaOk);
+  X64MovRegReg(A, xrR14, xrRAX);
+  X64BindLabel(A, BoundsMinArenaOk);
+  X64MovRegReg(A, xrRAX, xrR12);
+  X64AddRegImm32(A, xrRAX, FSIM_GC_SMALL_ARENA_BYTES);
+  X64CmpRegReg(A, xrR15, xrRAX);
+  X64JumpCondition(A, xcAboveEqual, BoundsMaxArenaOk);
+  X64MovRegReg(A, xrR15, xrRAX);
+  X64BindLabel(A, BoundsMaxArenaOk);
+  X64BindLabel(A, BoundsArenaAdvance);
+  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
+  X64Jump(A, BoundsArenaLoop);
+
+  X64BindLabel(A, BoundsLargeStart);
+  X64LeaRegRipWritable(A, xrR12, D.AllocatorHead, 0);
+  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
+  X64BindLabel(A, BoundsLargeLoop);
+  X64TestRegReg(A, xrR12, xrR12);
+  X64JumpCondition(A, xcEqual, BoundsStore);
+  X64MovRegMemBaseDisp(A, xrRAX, xrR12, 24);
+  X64MovRegReg(A, xrRCX, xrRAX);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
+  X64CmpRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_LARGE);
+  X64JumpCondition(A, xcNotEqual, BoundsLargeAdvance);
+  X64LeaRegBaseDisp(A, xrRAX, xrR12, FSIM_HEAP_HEADER_SIZE);
+  X64CmpRegReg(A, xrR14, xrRAX);
+  X64JumpCondition(A, xcBelowEqual, BoundsMinLargeOk);
+  X64MovRegReg(A, xrR14, xrRAX);
+  X64BindLabel(A, BoundsMinLargeOk);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR12, 16);
+  X64AddRegReg(A, xrRAX, xrRCX);
+  X64CmpRegReg(A, xrR15, xrRAX);
+  X64JumpCondition(A, xcAboveEqual, BoundsMaxLargeOk);
+  X64MovRegReg(A, xrR15, xrRAX);
+  X64BindLabel(A, BoundsMaxLargeOk);
+  X64BindLabel(A, BoundsLargeAdvance);
+  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
+  X64Jump(A, BoundsLargeLoop);
+
+  X64BindLabel(A, BoundsStore);
+  X64LeaRegRipWritable(A, xrR12, D.GCMinAddress, 0);
+  X64MovMemBaseDispReg(A, xrR12, 0, xrR14);
+  X64LeaRegRipWritable(A, xrR12, D.GCMaxAddress, 0);
+  X64MovMemBaseDispReg(A, xrR12, 0, xrR15);
+  X64LeaRegRipWritable(A, xrR12, D.GCMarkHead, 0);
+  X64XorRegReg(A, xrRAX, xrRAX);
+  X64MovMemBaseDispReg(A, xrR12, 0, xrRAX);
+
+  { Clear transient mark/scanned state.  Preserve the header cookie, large and
+    pinned flags.  Allocated header +8 is tracing scratch; dead small +8 is a
+    free-list link and must not be touched. }
   X64LeaRegRipWritable(A, xrR12, D.AllocatorHead, 0);
   X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
   X64BindLabel(A, ClearLoop);
   X64TestRegReg(A, xrR12, xrR12);
-  X64JumpCondition(A, xcEqual, RootStackLoop);
+  X64JumpCondition(A, xcEqual, RootStackStart);
   X64MovRegMemBaseDisp(A, xrRAX, xrR12, 24);
   X64AndRegImm32(A, xrRAX, -7);
-  { Always persist the cleared transient bits.  Pinned blocks are then
-    promoted back to marked roots below. }
   X64MovMemBaseDispReg(A, xrR12, 24, xrRAX);
+  X64MovRegReg(A, xrRCX, xrRAX);
+  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED);
+  X64TestRegReg(A, xrRCX, xrRCX);
+  X64JumpCondition(A, xcEqual, ClearNext);
+  X64XorRegReg(A, xrRCX, xrRCX);
+  X64MovMemBaseDispReg(A, xrR12, 8, xrRCX);
   X64MovRegReg(A, xrRCX, xrRAX);
   X64AndRegImm32(A, xrRCX, FSIM_HEAP_PINNED);
   X64TestRegReg(A, xrRCX, xrRCX);
   X64JumpCondition(A, xcEqual, ClearNext);
+  { Pinned allocations are roots and can be enqueued directly. }
   X64MovRegImm64(A, xrRCX, FSIM_HEAP_MARKED);
   X64OrRegReg(A, xrRAX, xrRCX);
   X64MovMemBaseDispReg(A, xrR12, 24, xrRAX);
+  X64LeaRegRipWritable(A, xrR9, D.GCMarkHead, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR9, 0);
+  X64MovMemBaseDispReg(A, xrR12, 8, xrRCX);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrR12);
   X64BindLabel(A, ClearNext);
   X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
   X64Jump(A, ClearLoop);
 
   { Conservative main-stack roots. }
-  X64BindLabel(A, RootStackLoop);
+  X64BindLabel(A, RootStackStart);
   X64MovRegReg(A, xrR12, xrRSP);
   X64LeaRegRipWritable(A, xrR13, D.GCStackTop, 0);
   X64MovRegMemBaseDisp(A, xrR13, xrR13, 0);
-  X64BindLabel(A, RootStackDone);
+  X64BindLabel(A, RootStackLoop);
   X64CmpRegReg(A, xrR12, xrR13);
-  X64JumpCondition(A, xcAboveEqual, RootDataLoop);
+  X64JumpCondition(A, xcAboveEqual, RootDataStart);
   X64MovRegMemBaseDisp(A, xrRDI, xrR12, 0);
   X64Call(A, L.GCMarkCandidate);
   X64AddRegImm32(A, xrR12, 8);
-  X64Jump(A, RootStackDone);
+  X64Jump(A, RootStackLoop);
 
-  { Scan only program-owned writable roots.  Runtime allocator metadata lives
-    in the same ELF segment, but scanning AllocatorHead/free-list/cursor state
-    as roots would couple reachability to allocator internals and can retain
-    otherwise dead objects through incidental interior-looking values. }
-  X64BindLabel(A, RootDataLoop);
+  { Scan only program-owned writable globals.  Runtime allocator metadata is
+    deliberately excluded so bookkeeping can never keep user objects alive. }
+  X64BindLabel(A, RootDataStart);
   X64LeaRegRipWritable(A, xrR12, WritableRootOffset, 0);
   X64MovRegReg(A, xrR13, xrR12);
   if (WritableRootBytes and not 7) > 0 then
     X64AddRegImm32(A, xrR13, WritableRootBytes and not 7);
-  X64BindLabel(A, RootDataDone);
+  X64BindLabel(A, RootDataLoop);
   X64CmpRegReg(A, xrR12, xrR13);
-  X64JumpCondition(A, xcAboveEqual, ClosureAgain);
+  X64JumpCondition(A, xcAboveEqual, ClosureLoop);
   X64MovRegMemBaseDisp(A, xrRDI, xrR12, 0);
   X64Call(A, L.GCMarkCandidate);
   X64AddRegImm32(A, xrR12, 8);
-  X64Jump(A, RootDataDone);
+  X64Jump(A, RootDataLoop);
 
-  { Iterate marked-but-unscanned objects until the reachable closure is
-    complete.  No recursion means collection cannot overflow the program
-    stack on deep object graphs. }
-  X64BindLabel(A, ClosureAgain);
-  X64XorRegReg(A, xrR15, xrR15); { progress }
-  X64LeaRegRipWritable(A, xrR12, D.AllocatorHead, 0);
-  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
+  { Explicit mark work list.  Every reached allocation is scanned once; graph
+    depth no longer causes repeated whole-heap fixed-point traversals. }
   X64BindLabel(A, ClosureLoop);
+  X64LeaRegRipWritable(A, xrR9, D.GCMarkHead, 0);
+  X64MovRegMemBaseDisp(A, xrR12, xrR9, 0);
   X64TestRegReg(A, xrR12, xrR12);
   X64JumpCondition(A, xcEqual, ClosureDone);
+  X64MovRegMemBaseDisp(A, xrR14, xrR12, 8);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrR14);
+  X64XorRegReg(A, xrRCX, xrRCX);
+  X64MovMemBaseDispReg(A, xrR12, 8, xrRCX);
   X64MovRegMemBaseDisp(A, xrRAX, xrR12, 24);
-  X64MovRegReg(A, xrRCX, xrRAX);
-  X64AndRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_MARKED);
-  X64CmpRegImm32(A, xrRCX, FSIM_HEAP_ALLOCATED or FSIM_HEAP_MARKED);
-  X64JumpCondition(A, xcNotEqual, ClosureNext);
-  X64MovRegReg(A, xrRCX, xrRAX);
-  X64AndRegImm32(A, xrRCX, FSIM_HEAP_SCANNED);
-  X64TestRegReg(A, xrRCX, xrRCX);
-  X64JumpCondition(A, xcNotEqual, ClosureNext);
   X64MovRegImm64(A, xrRCX, FSIM_HEAP_SCANNED);
   X64OrRegReg(A, xrRAX, xrRCX);
   X64MovMemBaseDispReg(A, xrR12, 24, xrRAX);
-  X64MovRegImm64(A, xrR15, 1);
   X64LeaRegBaseDisp(A, xrR13, xrR12, FSIM_HEAP_HEADER_SIZE);
   X64MovRegMemBaseDisp(A, xrR14, xrR12, 16);
   X64AddRegReg(A, xrR14, xrR13);
@@ -1121,12 +1434,8 @@ begin
   X64AddRegImm32(A, xrR13, 8);
   X64Jump(A, ScanLoop);
   X64BindLabel(A, ScanDone);
-  X64BindLabel(A, ClosureNext);
-  X64MovRegMemBaseDisp(A, xrR12, xrR12, 0);
   X64Jump(A, ClosureLoop);
   X64BindLabel(A, ClosureDone);
-  X64TestRegReg(A, xrR15, xrR15);
-  X64JumpCondition(A, xcNotEqual, ClosureAgain);
 
   { Sweep.  r12=current header, r13=previous kept header, r14=next,
     rbx=reclaimed payload bytes, r15=live payload bytes. }
@@ -1148,7 +1457,7 @@ begin
   X64AndRegImm32(A, xrRCX, FSIM_HEAP_MARKED);
   X64TestRegReg(A, xrRCX, xrRCX);
   X64JumpCondition(A, xcNotEqual, SweepLive);
-  X64MovRegMemBaseDisp(A, xrR11, xrR12, 16); { payload bytes }
+  X64MovRegMemBaseDisp(A, xrR11, xrR12, 16);
   X64AddRegReg(A, xrRBX, xrR11);
   X64MovRegReg(A, xrRCX, xrRAX);
   X64AndRegImm32(A, xrRCX, FSIM_HEAP_LARGE);
@@ -1169,7 +1478,6 @@ begin
   X64Jump(A, SweepNext);
 
   X64BindLabel(A, SweepDeadSmall);
-  { Find the power-of-two class from the stored payload size. }
   X64MovRegImm64(A, xrRDX, 16);
   X64XorRegReg(A, xrRCX, xrRCX);
   X64BindLabel(A, ClassLoop);
@@ -1185,13 +1493,13 @@ begin
   X64MovRegMemBaseDisp(A, xrRAX, xrR9, 0);
   X64MovMemBaseDispReg(A, xrR12, 8, xrRAX);
   X64MovMemBaseDispReg(A, xrR9, 0, xrR12);
-  X64XorRegReg(A, xrRAX, xrRAX);
+  X64MovRegImm64(A, xrRAX, FSIM_HEAP_MAGIC);
   X64MovMemBaseDispReg(A, xrR12, 24, xrRAX);
-  X64MovRegReg(A, xrR13, xrR12); { stays on all-allocation list }
+  X64MovRegReg(A, xrR13, xrR12); { remains on all-allocation list }
   X64Jump(A, SweepNext);
 
   X64BindLabel(A, SweepDeadLarge);
-  { Remove from the intrusive list before munmap invalidates the header. }
+  { Remove from the intrusive list before munmap invalidates its header. }
   X64TestRegReg(A, xrR13, xrR13);
   X64JumpCondition(A, xcNotEqual, LargeHasPrev);
   X64LeaRegRipWritable(A, xrR9, D.AllocatorHead, 0);
@@ -1213,6 +1521,33 @@ begin
   X64Jump(A, SweepLoop);
 
   X64BindLabel(A, SweepFinish);
+  { Finish pause timing before post-collection bookkeeping. }
+  X64SubRegImm32(A, xrRSP, 16);
+  X64MovRegImm64(A, xrRDI, 1);
+  X64MovRegReg(A, xrRSI, xrRSP);
+  X64MovRegImm64(A, xrRAX, LINUX_SYS_CLOCK_GETTIME);
+  X64Syscall(A);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRSP, 0);
+  X64IMulRegRegImm32(A, xrRAX, xrRAX, 1000000000);
+  X64MovRegMemBaseDisp(A, xrRCX, xrRSP, 8);
+  X64AddRegReg(A, xrRAX, xrRCX);
+  X64AddRegImm32(A, xrRSP, 16);
+  X64LeaRegRipWritable(A, xrR9, D.GCStartNS, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR9, 0);
+  X64SubRegReg(A, xrRAX, xrRCX); { elapsed ns }
+  X64LeaRegRipWritable(A, xrR9, D.GCLastPauseNS, 0);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
+  X64LeaRegRipWritable(A, xrR9, D.GCTotalPauseNS, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR9, 0);
+  X64AddRegReg(A, xrRCX, xrRAX);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRCX);
+  X64LeaRegRipWritable(A, xrR9, D.GCMaxPauseNS, 0);
+  X64MovRegMemBaseDisp(A, xrRCX, xrR9, 0);
+  X64CmpRegReg(A, xrRAX, xrRCX);
+  X64JumpCondition(A, xcBelowEqual, PauseMaxDone);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
+  X64BindLabel(A, PauseMaxDone);
+
   X64LeaRegRipWritable(A, xrR9, D.GCLiveBytes, 0);
   X64MovMemBaseDispReg(A, xrR9, 0, xrR15);
   X64LeaRegRipWritable(A, xrR9, D.GCReclaimedBytes, 0);
@@ -1223,6 +1558,24 @@ begin
   X64MovRegMemBaseDisp(A, xrRAX, xrR9, 0);
   X64AddRegImm32(A, xrRAX, 1);
   X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
+
+  { Adapt the next collection budget to the post-GC live set.  The old fixed
+    16-arena cadence produced regular full-heap pauses in allocation-heavy
+    interactive programs. }
+  X64MovRegReg(A, xrRAX, xrR15);
+  X64ShrRegImm8(A, xrRAX, 20); { live MiB }
+  X64AddRegImm32(A, xrRAX, FSIM_GC_MIN_ARENA_TRIGGER);
+  X64CmpRegImm32(A, xrRAX, FSIM_GC_MIN_ARENA_TRIGGER);
+  X64JumpCondition(A, xcAboveEqual, TriggerMinOk);
+  X64MovRegImm64(A, xrRAX, FSIM_GC_MIN_ARENA_TRIGGER);
+  X64BindLabel(A, TriggerMinOk);
+  X64CmpRegImm32(A, xrRAX, FSIM_GC_MAX_ARENA_TRIGGER);
+  X64JumpCondition(A, xcBelowEqual, TriggerMaxOk);
+  X64MovRegImm64(A, xrRAX, FSIM_GC_MAX_ARENA_TRIGGER);
+  X64BindLabel(A, TriggerMaxOk);
+  X64LeaRegRipWritable(A, xrR9, D.GCNextArenaTrigger, 0);
+  X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
+
   X64LeaRegRipWritable(A, xrR9, D.GCArenasSinceCollection, 0);
   X64XorRegReg(A, xrRAX, xrRAX);
   X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
@@ -1235,8 +1588,8 @@ begin
   X64Ret(A);
 
   X64BindLabel(A, AbortLabel);
-  { Avoid attempting a full heap walk on every allocation while a worker is
-    intentionally long-lived.  The next arena budget schedules another try. }
+  { A live worker postpones collection.  Reset pressure so the allocator tries
+    again after another adaptive budget, never on every allocation. }
   X64LeaRegRipWritable(A, xrR9, D.GCArenasSinceCollection, 0);
   X64XorRegReg(A, xrRAX, xrRAX);
   X64MovMemBaseDispReg(A, xrR9, 0, xrRAX);
@@ -1247,6 +1600,7 @@ begin
   X64PopReg(A, xrRBX);
   X64Ret(A);
 end;
+
 
 procedure EmitGCStats(var A: TX64Assembler; const L: TRuntimeLabels;
   const D: TRuntimeDataOffsets);
@@ -1263,45 +1617,86 @@ begin
   X64LeaRegRipWritable(A, xrRAX, D.GCCollections, 0);
   X64MovRegMemBaseDisp(A, xrRAX, xrRAX, 0);
   X64Ret(A);
+  X64BindLabel(A, L.GCLastPauseNS);
+  X64LeaRegRipWritable(A, xrRAX, D.GCLastPauseNS, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRAX, 0);
+  X64Ret(A);
+  X64BindLabel(A, L.GCMaxPauseNS);
+  X64LeaRegRipWritable(A, xrRAX, D.GCMaxPauseNS, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRAX, 0);
+  X64Ret(A);
+  X64BindLabel(A, L.GCTotalPauseNS);
+  X64LeaRegRipWritable(A, xrRAX, D.GCTotalPauseNS, 0);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRAX, 0);
+  X64Ret(A);
 end;
 
 procedure EmitMemoryCopy(var A: TX64Assembler; const L: TRuntimeLabels);
 var
-  LoopLabel, DoneLabel: Int32;
+  QWordLoop, ByteLoop, ByteTail, DoneLabel: Int32;
 begin
-  { rdi = destination, rsi = source, rdx = bytes }
-  LoopLabel := X64NewLabel(A);
+  { rdi = destination, rsi = source, rdx = bytes.  x86-64 permits unaligned
+    scalar accesses, so move full machine words before the short tail. }
+  QWordLoop := X64NewLabel(A);
+  ByteLoop := X64NewLabel(A);
+  ByteTail := X64NewLabel(A);
   DoneLabel := X64NewLabel(A);
   X64BindLabel(A, L.MemoryCopy);
   X64TestRegReg(A, xrRDX, xrRDX);
   X64JumpCondition(A, xcEqual, DoneLabel);
-  X64BindLabel(A, LoopLabel);
+  X64CmpRegImm32(A, xrRDX, 8);
+  X64JumpCondition(A, xcBelow, ByteTail);
+  X64BindLabel(A, QWordLoop);
+  X64MovRegMemBaseDisp(A, xrRAX, xrRSI, 0);
+  X64MovMemBaseDispReg(A, xrRDI, 0, xrRAX);
+  X64AddRegImm32(A, xrRSI, 8);
+  X64AddRegImm32(A, xrRDI, 8);
+  X64SubRegImm32(A, xrRDX, 8);
+  X64CmpRegImm32(A, xrRDX, 8);
+  X64JumpCondition(A, xcAboveEqual, QWordLoop);
+  X64BindLabel(A, ByteTail);
+  X64TestRegReg(A, xrRDX, xrRDX);
+  X64JumpCondition(A, xcEqual, DoneLabel);
+  X64BindLabel(A, ByteLoop);
   X64MovRegMemBaseDisp8(A, xrRAX, xrRSI, 0);
   X64MovMemBaseDispReg8(A, xrRDI, 0, xrRAX);
   X64AddRegImm32(A, xrRSI, 1);
   X64AddRegImm32(A, xrRDI, 1);
   X64SubRegImm32(A, xrRDX, 1);
-  X64JumpCondition(A, xcNotEqual, LoopLabel);
+  X64JumpCondition(A, xcNotEqual, ByteLoop);
   X64BindLabel(A, DoneLabel);
   X64Ret(A);
 end;
 
 procedure EmitMemoryZero(var A: TX64Assembler; const L: TRuntimeLabels);
 var
-  LoopLabel, DoneLabel: Int32;
+  QWordLoop, ByteLoop, ByteTail, DoneLabel: Int32;
 begin
   { rdi = destination, rsi = bytes }
-  LoopLabel := X64NewLabel(A);
+  QWordLoop := X64NewLabel(A);
+  ByteLoop := X64NewLabel(A);
+  ByteTail := X64NewLabel(A);
   DoneLabel := X64NewLabel(A);
   X64BindLabel(A, L.MemoryZero);
   X64XorRegReg(A, xrRAX, xrRAX);
   X64TestRegReg(A, xrRSI, xrRSI);
   X64JumpCondition(A, xcEqual, DoneLabel);
-  X64BindLabel(A, LoopLabel);
+  X64CmpRegImm32(A, xrRSI, 8);
+  X64JumpCondition(A, xcBelow, ByteTail);
+  X64BindLabel(A, QWordLoop);
+  X64MovMemBaseDispReg(A, xrRDI, 0, xrRAX);
+  X64AddRegImm32(A, xrRDI, 8);
+  X64SubRegImm32(A, xrRSI, 8);
+  X64CmpRegImm32(A, xrRSI, 8);
+  X64JumpCondition(A, xcAboveEqual, QWordLoop);
+  X64BindLabel(A, ByteTail);
+  X64TestRegReg(A, xrRSI, xrRSI);
+  X64JumpCondition(A, xcEqual, DoneLabel);
+  X64BindLabel(A, ByteLoop);
   X64MovMemBaseDispReg8(A, xrRDI, 0, xrRAX);
   X64AddRegImm32(A, xrRDI, 1);
   X64SubRegImm32(A, xrRSI, 1);
-  X64JumpCondition(A, xcNotEqual, LoopLabel);
+  X64JumpCondition(A, xcNotEqual, ByteLoop);
   X64BindLabel(A, DoneLabel);
   X64Ret(A);
 end;

@@ -1,0 +1,231 @@
+module SDL3;
+
+const integer SDL_INIT_AUDIO = 16;
+const integer SDL_INIT_VIDEO = 32;
+const integer SDL_INIT_JOYSTICK = 512;
+const integer SDL_INIT_HAPTIC = 4096;
+const integer SDL_INIT_GAMEPAD = 8192;
+const integer SDL_INIT_EVENTS = 16384;
+const integer SDL_INIT_SENSOR = 32768;
+const integer SDL_INIT_CAMERA = 65536;
+
+const integer SDL_EVENT_FIRST = 0;
+const integer SDL_EVENT_QUIT = 256;
+const integer SDL_EVENT_WINDOW_SHOWN = 514;
+const integer SDL_EVENT_WINDOW_HIDDEN = 515;
+const integer SDL_EVENT_WINDOW_EXPOSED = 516;
+const integer SDL_EVENT_WINDOW_MOVED = 517;
+const integer SDL_EVENT_WINDOW_RESIZED = 518;
+const integer SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED = 519;
+const integer SDL_EVENT_WINDOW_MINIMIZED = 521;
+const integer SDL_EVENT_WINDOW_MAXIMIZED = 522;
+const integer SDL_EVENT_WINDOW_RESTORED = 523;
+const integer SDL_EVENT_WINDOW_MOUSE_ENTER = 524;
+const integer SDL_EVENT_WINDOW_MOUSE_LEAVE = 525;
+const integer SDL_EVENT_WINDOW_FOCUS_GAINED = 526;
+const integer SDL_EVENT_WINDOW_FOCUS_LOST = 527;
+const integer SDL_EVENT_WINDOW_CLOSE_REQUESTED = 528;
+const integer SDL_EVENT_KEY_DOWN = 768;
+const integer SDL_EVENT_KEY_UP = 769;
+const integer SDL_EVENT_TEXT_EDITING = 770;
+const integer SDL_EVENT_TEXT_INPUT = 771;
+const integer SDL_EVENT_MOUSE_MOTION = 1024;
+const integer SDL_EVENT_MOUSE_BUTTON_DOWN = 1025;
+const integer SDL_EVENT_MOUSE_BUTTON_UP = 1026;
+const integer SDL_EVENT_MOUSE_WHEEL = 1027;
+
+const integer SDL_WINDOW_FULLSCREEN = 1;
+const integer SDL_WINDOW_OPENGL = 2;
+const integer SDL_WINDOW_OCCLUDED = 4;
+const integer SDL_WINDOW_HIDDEN = 8;
+const integer SDL_WINDOW_BORDERLESS = 16;
+const integer SDL_WINDOW_RESIZABLE = 32;
+const integer SDL_WINDOW_MINIMIZED = 64;
+const integer SDL_WINDOW_MAXIMIZED = 128;
+const integer SDL_WINDOW_MOUSE_GRABBED = 256;
+const integer SDL_WINDOW_INPUT_FOCUS = 512;
+const integer SDL_WINDOW_MOUSE_FOCUS = 1024;
+const integer SDL_WINDOW_EXTERNAL = 2048;
+const integer SDL_WINDOW_MODAL = 4096;
+const integer SDL_WINDOW_HIGH_PIXEL_DENSITY = 8192;
+const integer SDL_WINDOW_MOUSE_CAPTURE = 16384;
+const integer SDL_WINDOW_ALWAYS_ON_TOP = 32768;
+const integer SDL_WINDOW_UTILITY = 131072;
+const integer SDL_WINDOW_TOOLTIP = 262144;
+const integer SDL_WINDOW_POPUP_MENU = 524288;
+const integer SDL_WINDOW_KEYBOARD_GRABBED = 1048576;
+const integer SDL_WINDOW_VULKAN = 268435456;
+const integer SDL_WINDOW_METAL = 536870912;
+const integer SDL_WINDOW_TRANSPARENT = 1073741824;
+
+const integer SDL_TEXTUREACCESS_STATIC = 0;
+const integer SDL_TEXTUREACCESS_STREAMING = 1;
+const integer SDL_TEXTUREACCESS_TARGET = 2;
+const integer SDL_FLIP_NONE = 0;
+const integer SDL_FLIP_HORIZONTAL = 1;
+const integer SDL_FLIP_VERTICAL = 2;
+
+foreign c opaque record SDLWindow;
+foreign c opaque record SDLRenderer;
+foreign c opaque record SDLTexture;
+foreign c opaque record SDLSurface;
+foreign c opaque record SDLCursor;
+foreign c opaque record SDLGamepad;
+foreign c opaque record SDLJoystick;
+foreign c opaque record SDLAudioStream;
+foreign c opaque record SDLIOStream;
+foreign c opaque record SDLGPUDevice;
+
+foreign c record SDLPoint begin
+    x: c_int;
+    y: c_int;
+end;
+
+foreign c record SDLFPoint begin
+    x: c_float;
+    y: c_float;
+end;
+
+foreign c record SDLRect begin
+    x: c_int;
+    y: c_int;
+    w: c_int;
+    h: c_int;
+end;
+
+foreign c record SDLFRect begin
+    x: c_float;
+    y: c_float;
+    w: c_float;
+    h: c_float;
+end;
+
+foreign c record SDLColor begin
+    r: c_uchar;
+    g: c_uchar;
+    b: c_uchar;
+    a: c_uchar;
+end;
+
+foreign c record SDLFColor begin
+    r: c_float;
+    g: c_float;
+    b: c_float;
+    a: c_float;
+end;
+
+foreign c record SDLCommonEvent begin
+    eventType: c_uint;
+    reserved: c_uint;
+    timestamp: c_ulonglong;
+end;
+
+foreign c record SDLEventStorage begin
+    q0: c_ulonglong; q1: c_ulonglong; q2: c_ulonglong; q3: c_ulonglong;
+    q4: c_ulonglong; q5: c_ulonglong; q6: c_ulonglong; q7: c_ulonglong;
+    q8: c_ulonglong; q9: c_ulonglong; q10: c_ulonglong; q11: c_ulonglong;
+    q12: c_ulonglong; q13: c_ulonglong; q14: c_ulonglong; q15: c_ulonglong;
+end;
+
+foreign c union SDLEvent begin
+    eventType: c_uint;
+    common: SDLCommonEvent;
+    storage: SDLEventStorage;
+end;
+
+foreign c from "libSDL3.so.0" begin
+    function SDL_GetVersion(): c_int;
+    function SDL_GetRevision(): c_string;
+    function SDL_Init(flags: c_uint): c_bool;
+    function SDL_InitSubSystem(flags: c_uint): c_bool;
+    procedure SDL_QuitSubSystem(flags: c_uint);
+    function SDL_WasInit(flags: c_uint): c_uint;
+    procedure SDL_Quit();
+    function SDL_GetError(): c_string;
+    function SDL_ClearError(): c_bool;
+
+    function SDL_CreateWindow(title: c_string, width: c_int, height: c_int, flags: c_ulonglong): c_ptr(SDLWindow);
+    procedure SDL_DestroyWindow(window: c_ptr(SDLWindow));
+    function SDL_GetWindowID(window: c_ptr(SDLWindow)): c_uint;
+    function SDL_GetWindowTitle(window: c_ptr(SDLWindow)): c_string;
+    function SDL_SetWindowTitle(window: c_ptr(SDLWindow), title: c_string): c_bool;
+    function SDL_SetWindowPosition(window: c_ptr(SDLWindow), x: c_int, y: c_int): c_bool;
+    function SDL_GetWindowPosition(window: c_ptr(SDLWindow), x: c_ptr(c_int), y: c_ptr(c_int)): c_bool;
+    function SDL_SetWindowSize(window: c_ptr(SDLWindow), width: c_int, height: c_int): c_bool;
+    function SDL_GetWindowSize(window: c_ptr(SDLWindow), width: c_ptr(c_int), height: c_ptr(c_int)): c_bool;
+    function SDL_SetWindowMinimumSize(window: c_ptr(SDLWindow), width: c_int, height: c_int): c_bool;
+    function SDL_SetWindowMaximumSize(window: c_ptr(SDLWindow), width: c_int, height: c_int): c_bool;
+    function SDL_ShowWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_HideWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_RaiseWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_MaximizeWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_MinimizeWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_RestoreWindow(window: c_ptr(SDLWindow)): c_bool;
+    function SDL_SetWindowFullscreen(window: c_ptr(SDLWindow), fullscreen: c_bool): c_bool;
+
+    function SDL_PollEvent(event: c_ptr(SDLEvent)): c_bool;
+    function SDL_WaitEvent(event: c_ptr(SDLEvent)): c_bool;
+    function SDL_WaitEventTimeout(event: c_ptr(SDLEvent), timeoutMS: c_int): c_bool;
+    procedure SDL_PumpEvents();
+    function SDL_PushEvent(event: c_ptr(SDLEvent)): c_bool;
+    procedure SDL_FlushEvent(eventType: c_uint);
+    procedure SDL_FlushEvents(minType: c_uint, maxType: c_uint);
+
+    function SDL_GetKeyboardState(keyCount: c_ptr(c_int)): c_ptr(c_bool);
+    function SDL_HasKeyboard(): c_bool;
+    function SDL_GetMouseState(x: c_ptr(c_float), y: c_ptr(c_float)): c_uint;
+    function SDL_GetGlobalMouseState(x: c_ptr(c_float), y: c_ptr(c_float)): c_uint;
+    function SDL_GetRelativeMouseState(x: c_ptr(c_float), y: c_ptr(c_float)): c_uint;
+    function SDL_SetWindowRelativeMouseMode(window: c_ptr(SDLWindow), enabled: c_bool): c_bool;
+    procedure SDL_WarpMouseInWindow(window: c_ptr(SDLWindow), x: c_float, y: c_float);
+    function SDL_ShowCursor(): c_bool;
+    function SDL_HideCursor(): c_bool;
+    function SDL_CursorVisible(): c_bool;
+
+    function SDL_CreateRenderer(window: c_ptr(SDLWindow), name: c_string): c_ptr(SDLRenderer);
+    procedure SDL_DestroyRenderer(renderer: c_ptr(SDLRenderer));
+    function SDL_GetRendererName(renderer: c_ptr(SDLRenderer)): c_string;
+    function SDL_SetRenderVSync(renderer: c_ptr(SDLRenderer), value: c_int): c_bool;
+    function SDL_SetRenderDrawColor(renderer: c_ptr(SDLRenderer), r: c_uchar, g: c_uchar, b: c_uchar, a: c_uchar): c_bool;
+    function SDL_SetRenderDrawColorFloat(renderer: c_ptr(SDLRenderer), r: c_float, g: c_float, b: c_float, a: c_float): c_bool;
+    function SDL_RenderClear(renderer: c_ptr(SDLRenderer)): c_bool;
+    function SDL_RenderPresent(renderer: c_ptr(SDLRenderer)): c_bool;
+    function SDL_RenderPoint(renderer: c_ptr(SDLRenderer), x: c_float, y: c_float): c_bool;
+    function SDL_RenderLine(renderer: c_ptr(SDLRenderer), x1: c_float, y1: c_float, x2: c_float, y2: c_float): c_bool;
+    function SDL_RenderRect(renderer: c_ptr(SDLRenderer), rect: c_ptr(SDLFRect)): c_bool;
+    function SDL_RenderFillRect(renderer: c_ptr(SDLRenderer), rect: c_ptr(SDLFRect)): c_bool;
+    function SDL_RenderRects(renderer: c_ptr(SDLRenderer), rects: c_ptr(SDLFRect), count: c_int): c_bool;
+    function SDL_RenderFillRects(renderer: c_ptr(SDLRenderer), rects: c_ptr(SDLFRect), count: c_int): c_bool;
+    function SDL_RenderTexture(renderer: c_ptr(SDLRenderer), texture: c_ptr(SDLTexture), source: c_ptr(SDLFRect), destination: c_ptr(SDLFRect)): c_bool;
+
+    function SDL_CreateTexture(renderer: c_ptr(SDLRenderer), format: c_uint, access: c_int, width: c_int, height: c_int): c_ptr(SDLTexture);
+    function SDL_CreateTextureFromSurface(renderer: c_ptr(SDLRenderer), surface: c_ptr(SDLSurface)): c_ptr(SDLTexture);
+    procedure SDL_DestroyTexture(texture: c_ptr(SDLTexture));
+    function SDL_UpdateTexture(texture: c_ptr(SDLTexture), rect: c_ptr(SDLRect), pixels: c_ptr(c_void), pitch: c_int): c_bool;
+    function SDL_SetTextureColorMod(texture: c_ptr(SDLTexture), r: c_uchar, g: c_uchar, b: c_uchar): c_bool;
+    function SDL_SetTextureAlphaMod(texture: c_ptr(SDLTexture), alpha: c_uchar): c_bool;
+
+    function SDL_LoadBMP(fileName: c_string): c_ptr(SDLSurface);
+    procedure SDL_DestroySurface(surface: c_ptr(SDLSurface));
+
+    function SDL_GetTicks(): c_ulonglong;
+    function SDL_GetTicksNS(): c_ulonglong;
+    function SDL_GetPerformanceCounter(): c_ulonglong;
+    function SDL_GetPerformanceFrequency(): c_ulonglong;
+    procedure SDL_Delay(milliseconds: c_uint);
+    procedure SDL_DelayNS(nanoseconds: c_ulonglong);
+
+    function SDL_SetClipboardText(value: c_string): c_bool;
+    function SDL_GetClipboardText(): c_string;
+    function SDLHasClipboardText(): c_bool = "SDL_HasClipboardText";
+
+    function SDL_IOFromFile(fileName: c_string, mode: c_string): c_ptr(SDLIOStream);
+    function SDL_ReadIO(stream: c_ptr(SDLIOStream), pointer: c_ptr(c_void), size: c_ulong): c_ulong;
+    function SDL_WriteIO(stream: c_ptr(SDLIOStream), pointer: c_ptr(c_void), size: c_ulong): c_ulong;
+    function SDL_CloseIO(stream: c_ptr(SDLIOStream)): c_bool;
+end;
+
+boolean function SDLEventIs(SDLEvent event, integer eventType);
+begin
+    return event.eventType = c_uint(eventType)
+end;

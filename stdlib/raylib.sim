@@ -116,6 +116,25 @@ const integer MOUSE_BUTTON_EXTRA = 4;
 const integer MOUSE_BUTTON_FORWARD = 5;
 const integer MOUSE_BUTTON_BACK = 6;
 
+const integer SHADER_UNIFORM_FLOAT = 0;
+const integer SHADER_UNIFORM_VEC2 = 1;
+const integer SHADER_UNIFORM_VEC3 = 2;
+const integer SHADER_UNIFORM_VEC4 = 3;
+const integer SHADER_UNIFORM_INT = 4;
+const integer SHADER_UNIFORM_IVEC2 = 5;
+const integer SHADER_UNIFORM_IVEC3 = 6;
+const integer SHADER_UNIFORM_IVEC4 = 7;
+const integer SHADER_UNIFORM_SAMPLER2D = 8;
+
+const integer BLEND_ALPHA = 0;
+const integer BLEND_ADDITIVE = 1;
+const integer BLEND_MULTIPLIED = 2;
+const integer BLEND_ADD_COLORS = 3;
+const integer BLEND_SUBTRACT_COLORS = 4;
+const integer BLEND_ALPHA_PREMULTIPLY = 5;
+const integer BLEND_CUSTOM = 6;
+const integer BLEND_CUSTOM_SEPARATE = 7;
+
 const integer CAMERA_CUSTOM = 0;
 const integer CAMERA_FREE = 1;
 const integer CAMERA_ORBITAL = 2;
@@ -271,6 +290,11 @@ foreign c record Music begin
     ctxData: c_ptr(c_void);
 end;
 
+foreign c record FilePathList begin
+    count: c_uint;
+    paths: c_ptr(c_string);
+end;
+
 foreign c from "libraylib.so.600" begin
     procedure InitWindow(width: c_int, height: c_int, title: c_string);
     procedure CloseWindow();
@@ -316,6 +340,41 @@ foreign c from "libraylib.so.600" begin
     function GetClipboardText(): c_string;
     procedure EnableEventWaiting();
     procedure DisableEventWaiting();
+    procedure OpenURL(url: c_string);
+    function LoadFileData(fileName: c_string, dataSize: c_ptr(c_int)): c_ptr(c_uchar);
+    procedure UnloadFileData(data: c_ptr(c_uchar));
+    function SaveFileData(fileName: c_string, data: c_ptr(c_void), dataSize: c_int): c_bool;
+    function LoadFileText(fileName: c_string): c_string;
+    procedure UnloadFileText(textData: c_string);
+    function SaveFileText(fileName: c_string, textData: c_string): c_bool;
+    function FileRename(fileName: c_string, renamedFile: c_string): c_int;
+    function FileRemove(fileName: c_string): c_int;
+    function FileCopy(sourcePath: c_string, destinationPath: c_string): c_int;
+    function FileMove(sourcePath: c_string, destinationPath: c_string): c_int;
+    function FileExists(fileName: c_string): c_bool;
+    function DirectoryExists(directoryPath: c_string): c_bool;
+    function IsFileExtension(fileName: c_string, extension: c_string): c_bool;
+    function GetFileLength(fileName: c_string): c_int;
+    function GetFileExtension(fileName: c_string): c_string;
+    function GetFileName(filePath: c_string): c_string;
+    function GetFileNameWithoutExt(filePath: c_string): c_string;
+    function GetDirectoryPath(filePath: c_string): c_string;
+    function GetPrevDirectoryPath(directoryPath: c_string): c_string;
+    function GetWorkingDirectory(): c_string;
+    function GetApplicationDirectory(): c_string;
+    function MakeDirectory(directoryPath: c_string): c_int;
+    function ChangeDirectory(directory: c_string): c_bool;
+    function IsPathFile(path: c_string): c_bool;
+    function IsFileNameValid(fileName: c_string): c_bool;
+    function LoadDirectoryFiles(directoryPath: c_string): FilePathList;
+    function LoadDirectoryFilesEx(basePath: c_string, filter: c_string, scanSubdirs: c_bool): FilePathList;
+    procedure UnloadDirectoryFiles(files: FilePathList);
+    function IsFileDropped(): c_bool;
+    function LoadDroppedFiles(): FilePathList;
+    procedure UnloadDroppedFiles(files: FilePathList);
+    function GetDirectoryFileCount(directoryPath: c_string): c_uint;
+    function GetDirectoryFileCountEx(basePath: c_string, filter: c_string, scanSubdirs: c_bool): c_uint;
+    function GetFileModTime(fileName: c_string): c_long;
 
     procedure ShowCursor();
     procedure HideCursor();
@@ -333,6 +392,12 @@ foreign c from "libraylib.so.600" begin
     procedure EndMode3D();
     procedure BeginTextureMode(target: RenderTexture2D);
     procedure EndTextureMode();
+    procedure BeginShaderMode(shader: Shader);
+    procedure EndShaderMode();
+    procedure BeginBlendMode(mode: c_int);
+    procedure EndBlendMode();
+    procedure BeginScissorMode(x: c_int, y: c_int, width: c_int, height: c_int);
+    procedure EndScissorMode();
 
     procedure SetTargetFPS(fps: c_int);
     function GetFrameTime(): c_float;
@@ -358,6 +423,11 @@ foreign c from "libraylib.so.600" begin
     function GetGamepadName(gamepad: c_int): c_string;
     function IsGamepadButtonPressed(gamepad: c_int, button: c_int): c_bool;
     function IsGamepadButtonDown(gamepad: c_int, button: c_int): c_bool;
+    function IsGamepadButtonReleased(gamepad: c_int, button: c_int): c_bool;
+    function IsGamepadButtonUp(gamepad: c_int, button: c_int): c_bool;
+    function GetGamepadButtonPressed(): c_int;
+    function SetGamepadMappings(mappings: c_string): c_int;
+    procedure SetGamepadVibration(gamepad: c_int, leftMotor: c_float, rightMotor: c_float, duration: c_float);
     function GetGamepadAxisCount(gamepad: c_int): c_int;
     function GetGamepadAxisMovement(gamepad: c_int, axis: c_int): c_float;
     function IsMouseButtonPressed(button: c_int): c_bool;
@@ -380,17 +450,34 @@ foreign c from "libraylib.so.600" begin
     procedure DrawLine(startPosX: c_int, startPosY: c_int, endPosX: c_int, endPosY: c_int, color: Color);
     procedure DrawLineV(startPos: Vector2, endPos: Vector2, color: Color);
     procedure DrawLineEx(startPos: Vector2, endPos: Vector2, thick: c_float, color: Color);
+    procedure DrawLineStrip(points: c_ptr(Vector2), pointCount: c_int, color: Color);
+    procedure DrawLineBezier(startPos: Vector2, endPos: Vector2, thick: c_float, color: Color);
+    procedure DrawLineDashed(startPos: Vector2, endPos: Vector2, dashSize: c_int, spaceSize: c_int, color: Color);
     procedure DrawCircle(centerX: c_int, centerY: c_int, radius: c_float, color: Color);
     procedure DrawCircleV(center: Vector2, radius: c_float, color: Color);
+    procedure DrawCircleSector(center: Vector2, radius: c_float, startAngle: c_float, endAngle: c_float, segments: c_int, color: Color);
+    procedure DrawCircleSectorLines(center: Vector2, radius: c_float, startAngle: c_float, endAngle: c_float, segments: c_int, color: Color);
+    procedure DrawCircleGradient(center: Vector2, radius: c_float, innerColor: Color, outerColor: Color);
     procedure DrawCircleLines(centerX: c_int, centerY: c_int, radius: c_float, color: Color);
+    procedure DrawCircleLinesV(center: Vector2, radius: c_float, color: Color);
     procedure DrawEllipse(centerX: c_int, centerY: c_int, radiusH: c_float, radiusV: c_float, color: Color);
+    procedure DrawEllipseV(center: Vector2, radiusH: c_float, radiusV: c_float, color: Color);
+    procedure DrawEllipseLines(centerX: c_int, centerY: c_int, radiusH: c_float, radiusV: c_float, color: Color);
+    procedure DrawEllipseLinesV(center: Vector2, radiusH: c_float, radiusV: c_float, color: Color);
+    procedure DrawRing(center: Vector2, innerRadius: c_float, outerRadius: c_float, startAngle: c_float, endAngle: c_float, segments: c_int, color: Color);
+    procedure DrawRingLines(center: Vector2, innerRadius: c_float, outerRadius: c_float, startAngle: c_float, endAngle: c_float, segments: c_int, color: Color);
     procedure DrawRectangle(posX: c_int, posY: c_int, width: c_int, height: c_int, color: Color);
     procedure DrawRectangleV(position: Vector2, size: Vector2, color: Color);
     procedure DrawRectangleRec(rec: Rectangle, color: Color);
     procedure DrawRectanglePro(rec: Rectangle, origin: Vector2, rotation: c_float, color: Color);
     procedure DrawRectangleLines(posX: c_int, posY: c_int, width: c_int, height: c_int, color: Color);
     procedure DrawRectangleLinesEx(rec: Rectangle, lineThick: c_float, color: Color);
+    procedure DrawRectangleGradientV(posX: c_int, posY: c_int, width: c_int, height: c_int, top: Color, bottom: Color);
+    procedure DrawRectangleGradientH(posX: c_int, posY: c_int, width: c_int, height: c_int, left: Color, right: Color);
+    procedure DrawRectangleGradientEx(rec: Rectangle, topLeft: Color, bottomLeft: Color, bottomRight: Color, topRight: Color);
     procedure DrawRectangleRounded(rec: Rectangle, roundness: c_float, segments: c_int, color: Color);
+    procedure DrawRectangleRoundedLines(rec: Rectangle, roundness: c_float, segments: c_int, color: Color);
+    procedure DrawRectangleRoundedLinesEx(rec: Rectangle, roundness: c_float, segments: c_int, lineThick: c_float, color: Color);
     procedure DrawTriangle(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
     procedure DrawTriangleLines(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
     procedure DrawPoly(center: Vector2, sides: c_int, radius: c_float, rotation: c_float, color: Color);
@@ -399,6 +486,17 @@ foreign c from "libraylib.so.600" begin
     function CheckCollisionCircleRec(center: Vector2, radius: c_float, rec: Rectangle): c_bool;
     function CheckCollisionPointRec(point: Vector2, rec: Rectangle): c_bool;
     function GetCollisionRec(rec1: Rectangle, rec2: Rectangle): Rectangle;
+
+    function LoadShader(vertexShaderFileName: c_string, fragmentShaderFileName: c_string): Shader;
+    function LoadShaderFromMemory(vertexShaderCode: c_string, fragmentShaderCode: c_string): Shader;
+    function IsShaderValid(shader: Shader): c_bool;
+    function GetShaderLocation(shader: Shader, uniformName: c_string): c_int;
+    function GetShaderLocationAttrib(shader: Shader, attributeName: c_string): c_int;
+    procedure SetShaderValue(shader: Shader, location: c_int, value: c_ptr(c_void), uniformType: c_int);
+    procedure SetShaderValueV(shader: Shader, location: c_int, value: c_ptr(c_void), uniformType: c_int, count: c_int);
+    procedure SetShaderValueMatrix(shader: Shader, location: c_int, matrix: Matrix);
+    procedure SetShaderValueTexture(shader: Shader, location: c_int, texture: Texture2D);
+    procedure UnloadShader(shader: Shader);
 
     function LoadImage(fileName: c_string): Image;
     function LoadImageFromTexture(texture: Texture2D): Image;

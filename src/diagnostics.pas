@@ -215,14 +215,103 @@ begin
   end;
 end;
 
+function SourceLineAt(const Source: RawByteString; WantedLine: UInt32;
+  out LineText: RawByteString): Boolean;
+var
+  I, StartAt, EndAt: SizeInt;
+  LineNo: UInt32;
+begin
+  Result := False;
+  LineText := '';
+  if (WantedLine = 0) or (Source = '') then Exit;
+  LineNo := 1;
+  StartAt := 1;
+  I := 1;
+  while (I <= Length(Source)) and (LineNo < WantedLine) do
+  begin
+    if Source[I] = #10 then
+    begin
+      Inc(LineNo);
+      StartAt := I + 1;
+    end;
+    Inc(I);
+  end;
+  if LineNo <> WantedLine then Exit;
+  EndAt := StartAt;
+  while (EndAt <= Length(Source)) and
+        not (Source[EndAt] in [#10, #13]) do
+    Inc(EndAt);
+  if EndAt > StartAt then
+    LineText := Copy(Source, StartAt, EndAt - StartAt)
+  else
+    LineText := '';
+  Result := True;
+end;
+
+function CaretPadding(const LineText: RawByteString; Column: UInt32): RawByteString;
+var
+  I, Limit: SizeInt;
+begin
+  Result := '';
+  if Column <= 1 then Exit;
+  Limit := Column - 1;
+  if Limit > Length(LineText) then Limit := Length(LineText);
+  for I := 1 to Limit do
+    if LineText[I] = #9 then Result := Result + #9
+    else Result := Result + ' ';
+end;
+
+function CaretWidth(const D: TDiagnostic): UInt32;
+begin
+  Result := 1;
+  if (D.Span.EndPos.Line = D.Span.StartPos.Line) and
+     (D.Span.EndPos.Column > D.Span.StartPos.Column) then
+  begin
+    Result := D.Span.EndPos.Column - D.Span.StartPos.Column;
+    if Result > 80 then Result := 80;
+  end;
+end;
+
+procedure PrintDiagnosticSourceContext(const D: TDiagnostic;
+  const Source: RawByteString; UseColor: Boolean;
+  EffectiveSeverity: TDiagnosticSeverity);
+var
+  LineText, Prefix, Reset: RawByteString;
+  Width, I: UInt32;
+begin
+  if not SourceLineAt(Source, D.Span.StartPos.Line, LineText) then Exit;
+  if UseColor then
+  begin
+    Prefix := ColorForSeverity(EffectiveSeverity);
+    Reset := #27'[0m';
+  end
+  else
+  begin
+    Prefix := '';
+    Reset := '';
+  end;
+  Writeln(StdErr, '  ', LineText);
+  Write(StdErr, '  ', CaretPadding(LineText, D.Span.StartPos.Column), Prefix);
+  Width := CaretWidth(D);
+  for I := 1 to Width do Write(StdErr, '^');
+  Writeln(StdErr, Reset);
+end;
+
 procedure PrintDiagnostics(const Bag: TDiagnosticBag; const FileName: RawByteString;
   UseColor: Boolean; WarningsAsErrors: Boolean);
 var
   I: Integer;
   D: TDiagnostic;
   EffectiveSeverity: TDiagnosticSeverity;
-  Prefix, Reset: RawByteString;
+  Prefix, Reset, Source: RawByteString;
 begin
+  Source := '';
+  if (FileName <> '') and FileExists(FileName) then
+    try
+      Source := LoadBinaryFile(FileName);
+    except
+      Source := '';
+    end;
   for I := 0 to High(Bag.Items) do
   begin
     D := Bag.Items[I];
@@ -243,6 +332,8 @@ begin
       D.Span.StartPos.Column, ': ', Prefix, SeverityName(EffectiveSeverity), Reset,
       ' [', DiagnosticCodeName(D.Code), ']: ', DiagnosticMessage(D));
     Writeln(StdErr);
+    if Source <> '' then
+      PrintDiagnosticSourceContext(D, Source, UseColor, EffectiveSeverity);
   end;
 end;
 

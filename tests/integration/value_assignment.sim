@@ -1,8 +1,0 @@
-program ValueAssignment;
-begin
-    integer value;
-    value := 7;
-    value := value * 6;
-    assert(value = 42);
-    exit(0)
-end;

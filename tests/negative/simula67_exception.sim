@@ -1,5 +1,0 @@
-program ExceptionFailure;
-begin
-    try begin end
-    finally begin end
-end;

@@ -1,9 +1,0 @@
-program MinimalSimula67;
-begin
-    integer answer;
-    answer := 40 + 2;
-    if answer = 42 then
-        exit(0)
-    else
-        exit(1)
-end;

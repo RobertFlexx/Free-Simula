@@ -1,5 +1,0 @@
-program StrictIdentifier;
-begin
-    integer old_style_name;
-    old_style_name := 1
-end;

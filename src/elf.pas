@@ -3388,6 +3388,12 @@ begin
     X64Call(G.Assembler, G.RuntimeLabels.GCReclaimedBytes)
   else if Name = 'gc_collection_count' then
     X64Call(G.Assembler, G.RuntimeLabels.GCCollectionCount)
+  else if Name = 'gc_last_pause_ns' then
+    X64Call(G.Assembler, G.RuntimeLabels.GCLastPauseNS)
+  else if Name = 'gc_max_pause_ns' then
+    X64Call(G.Assembler, G.RuntimeLabels.GCMaxPauseNS)
+  else if Name = 'gc_total_pause_ns' then
+    X64Call(G.Assembler, G.RuntimeLabels.GCTotalPauseNS)
   else if Name = 'atomic_load' then
   begin
     EmitNativeHandleCheck(G, xrRDI);
@@ -4468,7 +4474,7 @@ begin
     irMemoryFence:
       X64MemoryFence(G.Assembler);
 
-    irProcessDetach, irProcessResume, irProcessActivate,
+    irProcessDetach, irProcessCall, irProcessResume, irProcessActivate,
     irProcessReactivate, irProcessDelay, irProcessHold,
     irProcessPassivate:
       begin

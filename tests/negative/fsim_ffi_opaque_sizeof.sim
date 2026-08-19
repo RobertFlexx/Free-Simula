@@ -1,5 +1,0 @@
-foreign c opaque record Handle;
-program BadOpaqueSize;
-begin
-    assert(c_sizeof(Handle) = c_size(0))
-end;

@@ -57,6 +57,7 @@ type
     nkContinueStatement,
     nkAssertStatement,
     nkDetachStatement,
+    nkCallStatement,
     nkResumeStatement,
     nkActivateStatement,
     nkReactivateStatement,
@@ -459,6 +460,7 @@ begin
     nkContinueStatement: Result := 'ContinueStatement';
     nkAssertStatement: Result := 'AssertStatement';
     nkDetachStatement: Result := 'DetachStatement';
+    nkCallStatement: Result := 'CallStatement';
     nkResumeStatement: Result := 'ResumeStatement';
     nkActivateStatement: Result := 'ActivateStatement';
     nkReactivateStatement: Result := 'ReactivateStatement';

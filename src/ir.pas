@@ -152,6 +152,7 @@ type
     irDeferEnd,
     irMemoryFence,
     irProcessDetach,
+    irProcessCall,
     irProcessResume,
     irProcessActivate,
     irProcessReactivate,
@@ -417,6 +418,7 @@ begin
     irMutexLock, irMutexUnlock, irParallelBegin, irParallelEnd,
     irCriticalBegin, irCriticalEnd, irDeferBegin, irDeferEnd, irMemoryFence,
     irProcessDetach,
+    irProcessCall,
     irProcessResume, irProcessActivate, irProcessReactivate, irProcessDelay,
     irProcessHold, irProcessPassivate, irExitProcess, irUnreachable];
 end;
@@ -436,7 +438,7 @@ begin
     irTextPutFix, irTextPutReal, irTextPutFrac,
     irCall, irCallIndirect, irCallVirtual, irCallNative, irCallForeign, irCallForeignIndirect, irAssert, irRaise,
     irThreadSpawn, irThreadJoin, irFutureAwait, irChannelSend,
-    irChannelReceive, irMutexLock, irProcessResume, irProcessActivate, irProcessReactivate];
+    irChannelReceive, irMutexLock, irProcessCall, irProcessResume, irProcessActivate, irProcessReactivate];
 end;
 
 function IREmit(var ProgramIR: TIRProgram; FunctionId, BlockId: Int32;
@@ -643,6 +645,7 @@ begin
     irDeferEnd: Result := 'defer.end';
     irMemoryFence: Result := 'memory.fence';
     irProcessDetach: Result := 'process.detach';
+    irProcessCall: Result := 'process.call';
     irProcessResume: Result := 'process.resume';
     irProcessActivate: Result := 'process.activate';
     irProcessReactivate: Result := 'process.reactivate';
@@ -3246,6 +3249,8 @@ begin
         IR_INVALID_VALUE, IR_INVALID_VALUE, FSIM_TYPE_VOID,
         FSIM_INVALID_INDEX, IR_INVALID_BLOCK, IR_INVALID_BLOCK, 0,
         FSIM_INVALID_INDEX, 0, 0.0, Builder.Tree^.Nodes[Node].Span);
+    nkCallStatement:
+      LowerActivation(Builder, Node, irProcessCall);
     nkResumeStatement:
       LowerActivation(Builder, Node, irProcessResume);
     nkActivateStatement:

@@ -1,5 +1,0 @@
-program ModernTry;
-begin
-    try begin end
-    catch(Exception Ref error) begin end
-end;

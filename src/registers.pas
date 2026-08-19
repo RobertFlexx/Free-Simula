@@ -442,7 +442,7 @@ begin
         irThreadSpawn, irThreadJoin, irThreadCancel, irThreadYield,
         irFutureAwait, irChannelSend, irChannelReceive,
         irMutexLock, irMutexUnlock, irCriticalBegin, irCriticalEnd,
-        irProcessDetach, irProcessResume, irProcessActivate,
+        irProcessDetach, irProcessCall, irProcessResume, irProcessActivate,
         irProcessReactivate, irProcessDelay, irProcessHold,
         irProcessPassivate]) then
       for J := 0 to High(Allocation.Intervals) do

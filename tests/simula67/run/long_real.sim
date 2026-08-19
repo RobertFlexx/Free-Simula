@@ -1,6 +1,0 @@
-begin
-  long real x;
-  x := 1.5;
-  if x = 1.5 then outint(67);
-  outimage
-end

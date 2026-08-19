@@ -1039,6 +1039,9 @@ var
   OperandNode, OperandType, SourceClass, TargetClass: Int32;
   TargetName: RawByteString;
 begin
+  if Analyzer.Options^.Dialect <> fdSimula67 then
+    ErrorNode(Analyzer, Node, dcDialectViolation,
+      'QUA is a classic SIMULA construct and is only available in simula67 mode');
   OperandNode := ChildAt(Analyzer, Node, 0);
   OperandType := AnalyzeExpression(Analyzer, OperandNode);
   TargetName := NodeName(Analyzer, Node);
@@ -2362,8 +2365,22 @@ begin
       end;
     nkProgramDecl, nkProcedureDecl, nkFunctionDecl:
       AnalyzeRoutine(Analyzer, Node);
-    nkClassDecl, nkProcessClassDecl, nkThreadClassDecl:
+    nkClassDecl:
       AnalyzeClass(Analyzer, Node);
+    nkProcessClassDecl:
+      begin
+        if Analyzer.Options^.Dialect <> fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'process classes belong to classic SIMULA and require simula67 mode');
+        AnalyzeClass(Analyzer, Node);
+      end;
+    nkThreadClassDecl:
+      begin
+        if Analyzer.Options^.Dialect = fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'thread classes are a Free Simula feature and are unavailable in simula67 mode');
+        AnalyzeClass(Analyzer, Node);
+      end;
     nkBlock, nkBlockStatement, nkStatementList:
       AnalyzeBlock(Analyzer, Node);
     nkVirtualSection, nkVisibilitySection,
@@ -2461,19 +2478,30 @@ begin
       AnalyzeExpression(Analyzer, ChildAt(Analyzer, Node, 0));
     nkDetachStatement, nkPassivateStatement:
       begin
+        if Analyzer.Options^.Dialect <> fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'classic SIMULA sequencing operations require simula67 mode');
         if Analyzer.CurrentClass < 0 then
           ErrorNode(Analyzer, Node, dcInvalidControlFlow,
             'process operation requires a process-class context');
       end;
-    nkResumeStatement:
+    nkCallStatement, nkResumeStatement:
       begin
+        if Analyzer.Options^.Dialect <> fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'classic SIMULA call/resume sequencing requires simula67 mode');
         TypeId := AnalyzeExpression(Analyzer, ChildAt(Analyzer, Node, 0));
         if not IsReferenceType(Analyzer, TypeId) then
           ErrorNode(Analyzer, Node, dcTypeMismatch,
-            'process operation requires a process reference');
+            'classic sequencing operation requires an object reference');
       end;
     nkActivateStatement, nkReactivateStatement:
-      AnalyzeActivation(Analyzer, Node);
+      begin
+        if Analyzer.Options^.Dialect <> fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'classic SIMULA activation statements require simula67 mode');
+        AnalyzeActivation(Analyzer, Node);
+      end;
     nkCancelStatement:
       AnalyzeFutureOperation(Analyzer, Node, 'cancel');
     nkJoinStatement:
@@ -2505,6 +2533,9 @@ begin
       end;
     nkDelayStatement, nkHoldStatement:
       begin
+        if Analyzer.Options^.Dialect <> fdSimula67 then
+          ErrorNode(Analyzer, Node, dcDialectViolation,
+            'classic SIMULA simulation timing operations require simula67 mode');
         TypeId := AnalyzeExpression(Analyzer, ChildAt(Analyzer, Node, 0));
         if not IsNumericType(Analyzer, TypeId) then
           ErrorNode(Analyzer, Node, dcTypeMismatch,

@@ -4193,6 +4193,18 @@ var
 begin
   Start := Parser.Current;
   Name := TokenText(Parser.Current);
+  { Standard SIMULA defines CALL as a sequencing procedure.  Keep it
+    contextual so modern fsim programs may still use `call` as an ordinary
+    identifier. }
+  if (Parser.Options^.Dialect = fdSimula67) and
+     ASCIIEqualFold(Name, 'call') then
+  begin
+    Advance(Parser);
+    Node := MakeNode(Parser, nkCallStatement, Start);
+    RightNode := ParseExpression(Parser);
+    if RightNode >= 0 then ASTAppendChild(Parser.Tree^, Node, RightNode);
+    Exit(Node);
+  end;
   if LookAt(Parser, tkColon) then
   begin
     Advance(Parser);

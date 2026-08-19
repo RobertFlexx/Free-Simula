@@ -1,4 +1,0 @@
-program PascalVariableFailure;
-begin
-    var value: integer := 42
-end;

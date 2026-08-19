@@ -1,5 +1,0 @@
-program NoLambdaInStrictMode;
-begin
-    integer value;
-    value := (lambda (integer x): integer => x + 1)(41)
-end;

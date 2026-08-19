@@ -1,0 +1,40 @@
+module Zlib;
+
+const integer Z_NO_FLUSH = 0;
+const integer Z_PARTIAL_FLUSH = 1;
+const integer Z_SYNC_FLUSH = 2;
+const integer Z_FULL_FLUSH = 3;
+const integer Z_FINISH = 4;
+const integer Z_BLOCK = 5;
+const integer Z_TREES = 6;
+
+const integer Z_OK = 0;
+const integer Z_STREAM_END = 1;
+const integer Z_NEED_DICT = 2;
+const integer Z_ERRNO = -1;
+const integer Z_STREAM_ERROR = -2;
+const integer Z_DATA_ERROR = -3;
+const integer Z_MEM_ERROR = -4;
+const integer Z_BUF_ERROR = -5;
+const integer Z_VERSION_ERROR = -6;
+
+const integer Z_NO_COMPRESSION = 0;
+const integer Z_BEST_SPEED = 1;
+const integer Z_BEST_COMPRESSION = 9;
+const integer Z_DEFAULT_COMPRESSION = -1;
+
+foreign c from "libz.so.1" begin
+    function zlibVersion(): c_string;
+    function zlibCompileFlags(): c_ulong;
+    function compress(destination: c_ptr(c_uchar), destinationLength: c_ptr(c_ulong), source: c_ptr(c_uchar), sourceLength: c_ulong): c_int;
+    function compress2(destination: c_ptr(c_uchar), destinationLength: c_ptr(c_ulong), source: c_ptr(c_uchar), sourceLength: c_ulong, level: c_int): c_int;
+    function compressBound(sourceLength: c_ulong): c_ulong;
+    function uncompress(destination: c_ptr(c_uchar), destinationLength: c_ptr(c_ulong), source: c_ptr(c_uchar), sourceLength: c_ulong): c_int;
+    function crc32(crc: c_ulong, buffer: c_ptr(c_uchar), length: c_uint): c_ulong;
+    function adler32(adler: c_ulong, buffer: c_ptr(c_uchar), length: c_uint): c_ulong;
+end;
+
+boolean function ZlibSucceeded(integer status);
+begin
+    return status = Z_OK
+end;

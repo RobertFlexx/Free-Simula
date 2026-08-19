@@ -1,0 +1,8 @@
+import SQLite3;
+program SQLiteVersion;
+begin
+    c_string version;
+    version := sqlite3_libversion();
+    assert(version <> c_string(0));
+    assert(sqlite3_libversion_number() > c_int(0))
+end;

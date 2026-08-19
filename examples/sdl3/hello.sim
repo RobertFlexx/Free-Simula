@@ -1,0 +1,30 @@
+import SDL3;
+program SDL3Hello;
+begin
+    c_ptr(SDLWindow) window;
+    c_ptr(SDLRenderer) renderer;
+    SDLEvent event;
+    boolean running;
+
+    assert(c_sizeof(SDLEvent) = 128);
+    assert(SDL_Init(c_uint(SDL_INIT_VIDEO)));
+    window := SDL_CreateWindow("Free Simula + SDL3", c_int(960), c_int(540), c_ulonglong(SDL_WINDOW_RESIZABLE));
+    assert(window <> c_ptr(SDLWindow)(0));
+    renderer := SDL_CreateRenderer(window, c_string(0));
+    assert(renderer <> c_ptr(SDLRenderer)(0));
+    running := true;
+    while running do
+    begin
+        while SDL_PollEvent(c_addr(event)) do
+        begin
+            if SDLEventIs(event, SDL_EVENT_QUIT) or SDLEventIs(event, SDL_EVENT_WINDOW_CLOSE_REQUESTED) then
+                running := false
+        end;
+        SDL_SetRenderDrawColor(renderer, c_uchar(20), c_uchar(24), c_uchar(34), c_uchar(255));
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer)
+    end;
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit()
+end;

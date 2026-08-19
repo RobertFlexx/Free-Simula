@@ -1,6 +1,0 @@
-program UnknownSymbol;
-begin
-    integer value;
-    value := missing + 1;
-    exit(0)
-end;

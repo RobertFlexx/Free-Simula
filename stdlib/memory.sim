@@ -29,3 +29,18 @@ boolean function UnpinManagedPointer(c_ptr(c_void) pointer);
 begin
     return gc_unpin(pointer)
 end;
+
+integer function GarbageCollectionLastPauseNS;
+begin
+    return gc_last_pause_ns()
+end;
+
+integer function GarbageCollectionMaxPauseNS;
+begin
+    return gc_max_pause_ns()
+end;
+
+integer function GarbageCollectionTotalPauseNS;
+begin
+    return gc_total_pause_ns()
+end;

@@ -1,20 +1,20 @@
 # simula 67 conformance notes
 
-this is deliberately less exciting than the readme. if you want drama, go read the changelog.
+this is deliberately less exciting than the readme
 
-syntax accepted, semantics represented, and native runtime behavior are three different things. fsim should not claim the third because the first one happened to parse. that sentence is the entire thesis of this document.
+syntax accepted, semantics represented and native runtime behavior are three different things, fsim should not claim the third because the first one happened to parse
 
 ## dialect boundary
 
-`-std=simula67` folds identifiers for lookup and injects the historical standard environment before user declarations are analyzed. `sysout`, `SYSOUT` and `SySoUt` therefore resolve to the same standard object. yes, all three. history was not case sensitive.
+`-std=simula67` folds identifiers for lookup and injects the historical standard environment before user declarations are analyzed, `sysout`, `SYSOUT` and `SySoUt` therefore resolve to the same standard object
 
-`-std=fsim` does neither of those things. lookup remains exact, and legacy globals/classes are absent unless a future explicit compatibility module is imported. classic source syntax which is useful outside the implicit environment remains accepted where it does not conflict with the modern profile.
+`-std=fsim` does neither of those things, lookup remains exact and legacy globals/classes are absent unless a future explicit compatibility module is imported, classic source syntax which is useful outside the implicit environment remains accepted where it does not conflict with the modern profile
 
-there are unit tests for both sides of this rule, because namespace leakage is the kind of bug that feels harmless until somebody names their own helper `blanks`.
+there are unit tests for both sides of this rule because namespace leakage is the kind of bug that feels harmless until somebody names their own helper `blanks`
 
 ## text runtime
 
-strict native `text` values are pointers to this visible descriptor shape:
+strict native `text` values are pointers to this visible descriptor shape
 
 ```pascal
 type
@@ -25,7 +25,7 @@ type
   end;
 ```
 
-that is 16 bytes on the amd64 target. the runtime keeps ownership/main-frame flags in hidden metadata before descriptors it owns, so the language value stays one pointer wide and the general ir does not need aggregate registers.
+that is 16 bytes on the amd64 target, the runtime keeps ownership/main-frame flags in hidden metadata before descriptors it owns so the language value stays one pointer wide and the general ir does not need aggregate registers
 
 | operation | strict implementation |
 |---|---|
@@ -45,11 +45,11 @@ that is 16 bytes on the amd64 target. the runtime keeps ownership/main-frame fla
 
 small strict descriptors and owned frames come from a dedicated 64 kib mmap backed arena, separate from the modern string/object allocator. Class and procedure parameter transmission preserves the Standard distinction: default `text` is a reference parameter; explicit `value text` receives an independent `copy` before entry.
 
-modern `string` keeps the previous native string abi and has no cursor position or historical frame aliasing hidden inside it. it is a string, not a museum piece.
+modern `string` keeps the previous native string abi and has no cursor position or historical frame aliasing hidden inside it
 
 ## basic io
 
-strict startup creates static `sysin` and `sysout` compatible objects and 132 character images.
+strict startup creates static `sysin` and `sysout` compatible objects and 132 character images
 
 | attribute | current native path |
 |---|---|
@@ -64,13 +64,13 @@ strict startup creates static `sysin` and `sysout` compatible objects and 132 ch
 | `outint`, `outfix`, `outreal`, `outfrac` | field editing and image output |
 | `outimage` | transfers the used image to fd 1, reblanks and resets it |
 
-old shorthand output statements are lowered through the same strict sysout path. they are not a second, slightly different printf implementation. one image layer, one set of bugs, one set of fixes.
+old shorthand output statements are lowered through the same strict sysout path, they are not a second slightly different printf implementation
 
-`file.open`, arbitrary external files, `directfile`, `bytefile`, and complete `printfile` page control are not finished yet. symbols which have no compiler-owned native implementation must diagnose rather than silently pretending success. a diagnostic is the compiler admitting the truth early.
+`file.open`, arbitrary external files, `directfile`, `bytefile` and complete `printfile` page control are not finished yet, symbols which have no compiler owned native implementation must diagnose rather than silently pretending success
 
 ## environment procedures
 
-currently bound and natively implemented in strict mode:
+currently bound and natively implemented in strict mode
 
 - `blanks`, `copy`
 - `char`, `isochar`, `rank`, `isorank`, `digit`, `letter`
@@ -78,9 +78,9 @@ currently bound and natively implemented in strict mode:
 - `mod`, `rem`, `entier`, `addepsilon`, `subepsilon`
 - `sqrt`, `sin`, `cos`, `tan`, `arctan`, `ln`, `log10`, `exp`
 
-`mod` and `rem` have separate backend semantics. `rem` follows signed division remainder while `mod` adjusts a nonzero remainder to have the divisor's sign. they were accidentally identical once, and there is a test so they never are again.
+`mod` and `rem` have separate backend semantics, `rem` follows signed division remainder while `mod` adjusts a nonzero remainder to have the divisor's sign
 
-not yet complete from the full standard environment are the generic arithmetic overloads such as `abs`, `sign`, `max` and `min`, the remaining transcendental functions, array bound inquiry, random-number procedures with name parameters, timing/error details, and the full implementation-defined constants set. they need proper type/runtime semantics rather than fake one-signature wrappers. to be continued :-)
+not yet complete from the full standard environment are the generic arithmetic overloads such as `abs`, `sign`, `max` and `min`, the remaining transcendental functions, array bound inquiry, random-number procedures with name parameters, timing/error details and the full implementation-defined constants set, they need proper type/runtime semantics rather than fake one-signature wrappers
 
 ## source and object semantics
 
@@ -88,30 +88,42 @@ not yet complete from the full standard environment are the generic arithmetic o
 |---|---|
 | algol blocks and declaration forms | parsed checked lowered |
 | `:=` and `:-` distinction | native paths including strict text behavior |
-| prefix classes, inherited layout, and `inner` | native path plus regression coverage |
+| prefix classes inherited layout and `inner` | native path plus regression coverage |
 | class parameters / constructors | checked and lowered, including Standard default-reference `text` and explicit `value text` copy-on-entry |
 | `new`, `this`, `qua`, `is`, `in`, `none`, identity comparison | native paths |
 | `inspect / when / otherwise` | checked and lowered |
 | classic `protected` / `hidden` lists | access checked |
 | old procedure/function heads and result-name assignment | supported |
 | proper procedure parameters | callable by native code pointer with signature compatibility checks; general call-by-name remains incomplete |
-| radix numbers, old exponent forms, comments, end comments, strings, char codes | lexer regression coverage |
-| logical precedence, `and then`, `or else`, `imp`, `eqv` | cfg lowering with short circuit |
+| radix numbers old exponent forms comments end comments strings char codes | lexer regression coverage |
+| logical precedence `and then` `or else` `imp` `eqv` | cfg lowering with short circuit |
 | multidimensional `a(i,j)` | nested-dimension read/write lowering |
-| labels, switches, local designational transfer | supported locally |
+| labels switches local designational transfer | supported locally |
 | external class/procedure heads | source model only, target linkage is implementation specific |
 
-numeric lowering now materializes integer to real widening at calls, assignments, initializers, returns, and mixed real operations. the conversion opcodes existed before but were not actually emitted at those boundaries; now they are, and the numbers finally agree.
+numeric lowering now materializes integer to real widening at calls assignments initializers returns and mixed real operations, the conversion opcodes existed before but were not actually emitted at those boundaries
 
 ## hard blockers before a universal standards-conformance claim
 
 - true call by name needs caller thunks and environments, including writable/name assignment behavior
 - non local goto needs runtime unwinding across active block/procedure instances
-- `Simulation` still needs the full cooperative event-set scheduler, activation/reactivation rules, and process continuation model
+- `Simulation` still needs the full cooperative event-set scheduler, activation/reactivation rules and process continuation model
 - complete historical file classes and the rest of `ENVIRONMENT` still need native implementations
-- arbitrary external object formats need explicit target adapters; there is no honest generic linker trick for that
-- a release claiming full standards conformance needs comparison against a published reference corpus using a compiler actually built with fpc; static source audits do not count
+- arbitrary external object formats need explicit target adapters, there is no honest generic linker trick for that
+- a release claiming full standards conformance needs comparison against a published reference corpus using a compiler actually built with fpc, static source audits do not count
 
-Free Simula may be advertised as a direct Simula dialect, and the `-std=simula67` profile as a substantial/native Simula 67 compatibility mode. that is the claim, and that is the whole claim.
+Free Simula may be advertised as a direct Simula dialect and the `-std=simula67` profile as a substantial/native Simula 67 compatibility mode. Do not advertise ISO/standard-complete conformance while the blockers above remain.
 
-for known unsupported native cases the backend is expected to give a diagnostic instead of producing an executable it already knows is wrong.
+for known unsupported native cases the backend is expected to give a diagnostic instead of producing an executable it already knows is wrong
+
+## 3.0 dialect and quasi-parallel boundary
+
+`QUA` is implemented as a checked classic object qualification operation and is now explicitly restricted to `-std=simula67`. Modern Free Simula code that needs an ordinary conversion/type test should use the modern language facilities rather than importing historical qualification syntax by accident.
+
+The Standard's chapter 7 quasi-parallel model is not just a spelling for modern threads or generators. It defines attached, detached, resumed and terminated object states, saved reactivation points, operating/reactivation chains, and the `detach`, `call` and `resume` sequencing relationship.
+
+3.0 recognizes the classic sequencing surface only in `-std=simula67`. In particular, Standard-style `call(object)` is parsed contextually in the strict profile while `call` remains an ordinary identifier in `-std=fsim`.
+
+Native continuation switching is still a hard conformance boundary. The backend rejects process detach/call/resume/activation IR until it can preserve the Standard reactivation-chain semantics. Treating these operations as native threads, ordinary function calls or no-ops would compile source while changing the language.
+
+The strict suite includes backend-negative cases for this boundary so an unfinished continuation implementation cannot accidentally become a successful but wrong executable.

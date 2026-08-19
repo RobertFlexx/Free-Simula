@@ -1,0 +1,7 @@
+import Zlib;
+program ZlibVersion;
+begin
+    c_string version;
+    version := zlibVersion();
+    assert(version <> c_string(0))
+end;

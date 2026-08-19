@@ -1,18 +1,16 @@
-# Free Simula Language Reference
-
-This is the reference for the `fsim` dialect and its historical sibling. It is written the way I talk, because that is the way I write. Everything in here is verifiable by running the compiler, which is the only reference that actually matters.
+# Free Simula 1.5 Language Reference
 
 ## 1. Dialects
 
 `-std=simula67` selects the historical profile. The scanner and parser reject fsim extensions, including `string`, visibility sections, thread classes, exceptions, modules, aliases, enums, assertions, and modern allocation syntax. Historical `text` remains a fixed-length value when a length is supplied.
 
-`-std=fsim` selects the modern profile. It retains Simula token shapes and block syntax while enabling checked systems features. Same family, different century.
+`-std=fsim` selects the modern profile. It retains Simula token shapes and block syntax while enabling checked systems features.
 
-Keywords are case-insensitive. In `-std=simula67`, identifier lookup is case-insensitive as well, as history demands. In `-std=fsim`, user identifiers are case-sensitive; diagnostics and emitted symbol records preserve the spelling written in source, and `Foo` is not `foo` no matter how much you think it should be.
+Keywords are case-insensitive. In `-std=simula67`, identifier lookup is case-insensitive as well. In `-std=fsim`, user identifiers are case-sensitive; diagnostics and emitted symbol records preserve the spelling written in source.
 
 ## 2. Lexical structure
 
-A comment begins with `!` or the word `comment` and ends at the next semicolon. The semicolon belongs to the comment. This rule predates your grandparents and it is not changing today.
+A comment begins with `!` or the word `comment` and ends at the next semicolon. The semicolon belongs to the comment.
 
 ```simula
 ! this complete comment ends here;
@@ -25,7 +23,7 @@ Integer literals may be decimal, hexadecimal, binary, or octal. Real literals us
 
 ## 3. Blocks
 
-Every compound statement uses `begin` and `end`. There is no brace, and there is no semicolon begging to be optional.
+Every compound statement uses `begin` and `end`.
 
 ```simula
 begin
@@ -66,7 +64,7 @@ count := 4;
 animal :- new Dog();
 ```
 
-The semantic analyzer rejects the wrong assignment operator even when the machine representation happens to be pointer-sized. The language means what it says, and it says two different things here.
+The semantic analyzer rejects the wrong assignment operator even when the machine representation happens to be pointer-sized.
 
 ## 6. Classes and prefix inheritance
 
@@ -92,7 +90,7 @@ The prefix must name an earlier class declaration. Prefix cycles and invalid pre
 
 `Public:`, `Private:`, and `Protected:` are parser state switches. Every declaration after a switch receives that visibility until the next switch or the end of the class.
 
-Private members are visible only to the declaring class. Protected members are visible to the declaring class and descendants. Public members are visible everywhere, including the places you later regret.
+Private members are visible only to the declaring class. Protected members are visible to the declaring class and descendants. Public members are visible everywhere.
 
 ## 8. Virtual specifications
 
@@ -108,7 +106,7 @@ begin
 end;
 ```
 
-The repeated name is mandatory. The double semicolon terminates the structural specification. A concrete method matching the specification receives the inherited VMT slot. VMT slots are stable across prefix chains, which is what keeps dispatch fast and honest.
+The repeated name is mandatory. The double semicolon terminates the structural specification. A concrete method matching the specification receives the inherited VMT slot. VMT slots are stable across prefix chains.
 
 ## 9. Procedures and functions
 
@@ -123,17 +121,17 @@ end;
 
 Parameters default to value mode. `name` selects historical call-by-name metadata and `ref` selects reference passing. The current x86-64 ABI passes the receiver first for methods, followed by explicit arguments.
 
-In `-std=fsim`, routines are first-class values through structural `procedure(...)` types. For example, `procedure(integer): integer` accepts one integer and returns an integer. Named routines, compatible procedure variables, and non-capturing lambdas can be passed, stored, called indirectly, and returned from functions. Expression lambdas use `lambda (integer x): integer => x * 2`. Capturing an outer local or `this` is currently rejected rather than miscompiled; see [procedures-as-values.md](procedures-as-values.md).
+In `-std=fsim`, routines are first-class values through structural `procedure(...)` types. For example, `procedure(integer): integer` accepts one integer and returns an integer. Named routines, compatible procedure variables, and non-capturing lambdas can be passed, stored, called indirectly, and returned from functions. Expression lambdas use `lambda (integer x): integer => x * 2`. Capturing an outer local or `this` is currently rejected rather than miscompiled; see `higher-order-procedures.md`.
 
 ## 10. Expressions
 
-Arithmetic operators include `+`, `-`, `*`, `/`, `//`, `mod`, `rem`, and `**`. Comparisons include `=`, `<>`, `<`, `<=`, `>`, and `>=`. Logical operators include `not`, `and`, `or`, `eqv`, and `imp`. In `-std=fsim`, integer operands make `and` and `or` bitwise, alongside `xor`, `shl`, and `shr`. Strict Simula 67 keeps `and`/`or` boolean-only, because the old language does not owe you a surprise.
+Arithmetic operators include `+`, `-`, `*`, `/`, `//`, `mod`, `rem`, and `**`. Comparisons include `=`, `<>`, `<`, `<=`, `>`, and `>=`. Logical operators include `not`, `and`, `or`, `eqv`, and `imp`. In `-std=fsim`, integer operands make `and` and `or` bitwise, alongside `xor`, `shl`, and `shr`. Strict Simula 67 keeps `and`/`or` boolean-only.
 
-In fsim mode, `+` concatenates strings. String equality compares length and UTF-8 bytes, not descriptor addresses. `s.length` returns the UTF-8 byte length, `s.byte(i)` returns the byte at a zero-based index as a `character`, `s.byte_value(i)` returns its integer byte value, `s.slice(first,count)` returns a checked copied slice, and `s.to_integer(default)` parses a base-10 signed integer without constructing a historical text frame. These byte-oriented attributes are intentional for systems code and filesystem paths; a filesystem path is a bag of bytes with opinions.
+In fsim mode, `+` concatenates strings. String equality compares length and UTF-8 bytes, not descriptor addresses. `s.length` returns the UTF-8 byte length, `s.byte(i)` returns the byte at a zero-based index as a `character`, `s.byte_value(i)` returns its integer byte value, `s.slice(first,count)` returns a checked copied slice, and `s.to_integer(default)` parses a base-10 signed integer without constructing a historical text frame. These byte-oriented attributes are intentional for systems code and filesystem paths.
 
 ## 11. QUA and RTTI
 
-`reference QUA TargetClass` performs a checked runtime cast. The static analyzer requires related source and target class hierarchies. The generated runtime walks serialized parent RTTI pointers. A failed cast transfers to the compiler-owned panic path before any field or VMT access occurs. The cast either proves itself or stops the program; there is no third option.
+`reference QUA TargetClass` performs a checked runtime cast. The static analyzer requires related source and target class hierarchies. The generated runtime walks serialized parent RTTI pointers. A failed cast transfers to the compiler-owned panic path before any field or VMT access occurs.
 
 ## 12. Control flow
 
@@ -150,11 +148,11 @@ Fsim additionally provides `break`, `continue`, `return`, `exit(status)`, and `a
 
 ## 13. Exceptions
 
-Fsim recognizes structured `try`, `catch`, `finally`, and `raise` statements. Same-function exception regions are represented explicitly in IR and a raised object must be a reference value. General cross-function unwinding and scope-exit cleanup are still backend work; `defer` therefore diagnoses during native emission instead of being compiled away. A diagnostic is not a bug, it is the compiler keeping its word.
+Fsim recognizes structured `try`, `catch`, `finally`, and `raise` statements. Same-function exception regions are represented explicitly in IR and a raised object must be a reference value. General cross-function unwinding and scope-exit cleanup are still backend work; `defer` therefore diagnoses during native emission instead of being compiled away.
 
 ## 14. Processes and threads
 
-`Process Class`, `detach`, `resume`, `activate`, `reactivate`, `hold`, `delay`, and `passivate` retain Simula vocabulary. `Thread Class` and `Task Class` are fsim-only native forms. Spawned tasks use direct Linux clone-backed stacks and futex completion. Cancellation is cooperative: a request does not mark the future complete until the task actually returns, because a cancelled task that is still running is a fact, not an opinion.
+`Process Class`, `detach`, `resume`, `activate`, `reactivate`, `hold`, `delay`, and `passivate` retain Simula vocabulary. `Thread Class` and `Task Class` are fsim-only native forms. Spawned tasks use direct Linux clone-backed stacks and futex completion. Cancellation is cooperative: a request does not mark the future complete until the task actually returns.
 
 ## 15. Modules
 
@@ -168,6 +166,7 @@ import "integer_collections.sim";
 
 Imports are expanded deterministically before lexing. Paths are resolved relative to the importing file and then through `-I`, `FSIM_PATH`, explicit standard-library configuration, installed-library discovery, and source-tree fallbacks. Unquoted names receive a `.sim` suffix and dotted names map to directories. Loading uses a DFS state machine, rejects cycles with a dedicated diagnostic, and can emit Make-compatible dependency files.
 
+
 ## 16. Modern syntax additions
 
 The fsim profile accepts Pascal-style declaration forms while retaining Simula block and class syntax:
@@ -180,10 +179,10 @@ begin
 end;
 ```
 
-Classic control forms include labels, switches, `inspect`, and process activation. Modern executable forms include `repeat`, `case`, `with`, `critical`, and `synchronized`. Native concurrency types are `channel(T)`, `future(T)`, `mutex`, `semaphore`, `barrier`, `condition`, and `atomic(integer)`. `parallel` and `defer` are recognized but deliberately rejected by the native backend until structured capture and scope-exit lowering are complete. See [the-two-profiles.md](the-two-profiles.md), [the-classic-profile.md](the-classic-profile.md), and [threads-and-locks.md](threads-and-locks.md) for profile-specific rules.
-
+Classic control forms include labels, switches, `inspect`, and process activation. Modern executable forms include `repeat`, `case`, `with`, `critical`, and `synchronized`. Native concurrency types are `channel(T)`, `future(T)`, `mutex`, `semaphore`, `barrier`, `condition`, and `atomic(integer)`. `parallel` and `defer` are recognized but deliberately rejected by the native backend until structured capture and scope-exit lowering are complete. See `dialects.md`, `classic-simula-compatibility.md`, and `concurrency.md` for profile-specific rules.
 ## 17. Native OS surface
 
-The native Linux backend exposes a small fsim-only systems surface with `os_` prefixes. It is not injected in `-std=simula67`. Current primitives cover argv access, directory handles backed by `openat`/`getdents64`, non-following path metadata, path joining/basenames, stdout path writes, and stderr writes. The surface is deliberately narrow rather than exposing a generic syscall-number escape hatch, because a syscall-number escape hatch is how OS layers become pincushions.
+The native Linux backend exposes a small fsim-only systems surface with `os_` prefixes. It is not injected in `-std=simula67`. Current primitives cover argv access, directory handles backed by `openat`/`getdents64`, non-following path metadata, path joining/basenames, stdout path writes, and stderr writes. The surface is deliberately narrow rather than exposing a generic syscall-number escape hatch.
 
 `tools/fsfind.sim` is the main systems example. It uses a bounded worker pool and shares directory work through a mutex-protected queue. Ordinary entries are matched from the directory buffer without constructing a full path, and output uses a single `writev` call for parent/name/separator/terminator.
+

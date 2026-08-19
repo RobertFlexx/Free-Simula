@@ -43,6 +43,8 @@ foreign c from "libncursesw.so.6" begin
     function addstr(message: c_string): c_int;
     function getch(): c_int;
     function getstr(buffer: c_ptr(c_char)): c_int;
+    function getnstr(buffer: c_ptr(c_char), count: c_int): c_int;
+    function mvgetnstr(y: c_int, x: c_int, buffer: c_ptr(c_char), count: c_int): c_int;
     function printw(format: c_string, ...): c_int;
     function mvaddstr(y: c_int, x: c_int, message: c_string): c_int;
     function mvprintw(y: c_int, x: c_int, format: c_string, ...): c_int;
@@ -66,14 +68,23 @@ foreign c from "libncursesw.so.6" begin
     function attrset(attrs: c_int): c_int;
 
     function newwin(lines: c_int, columns: c_int, begin_y: c_int, begin_x: c_int): c_ptr(NCWindow);
+    function subwin(window: c_ptr(NCWindow), lines: c_int, columns: c_int, begin_y: c_int, begin_x: c_int): c_ptr(NCWindow);
+    function derwin(window: c_ptr(NCWindow), lines: c_int, columns: c_int, begin_y: c_int, begin_x: c_int): c_ptr(NCWindow);
+    function dupwin(window: c_ptr(NCWindow)): c_ptr(NCWindow);
+    function mvderwin(window: c_ptr(NCWindow), parentY: c_int, parentX: c_int): c_int;
     function delwin(window: c_ptr(NCWindow)): c_int;
     function wrefresh(window: c_ptr(NCWindow)): c_int;
+    function wnoutrefresh(window: c_ptr(NCWindow)): c_int;
+    function redrawwin(window: c_ptr(NCWindow)): c_int;
+    function wredrawln(window: c_ptr(NCWindow), beginLine: c_int, lineCount: c_int): c_int;
     function wclear(window: c_ptr(NCWindow)): c_int;
     function werase(window: c_ptr(NCWindow)): c_int;
     function wmove(window: c_ptr(NCWindow), y: c_int, x: c_int): c_int;
     function waddch(window: c_ptr(NCWindow), ch: c_uint): c_int;
     function waddnstr(window: c_ptr(NCWindow), message: c_string, count: c_int): c_int;
     function wgetch(window: c_ptr(NCWindow)): c_int;
+    function wgetnstr(window: c_ptr(NCWindow), buffer: c_ptr(c_char), count: c_int): c_int;
+    function mvwgetnstr(window: c_ptr(NCWindow), y: c_int, x: c_int, buffer: c_ptr(c_char), count: c_int): c_int;
     function box(window: c_ptr(NCWindow), vertical: c_uint, horizontal: c_uint): c_int;
     function wborder(window: c_ptr(NCWindow), ls: c_uint, rs: c_uint, ts: c_uint, bs: c_uint, tl: c_uint, tr: c_uint, bl: c_uint, br: c_uint): c_int;
     function mvwaddnstr(window: c_ptr(NCWindow), y: c_int, x: c_int, message: c_string, count: c_int): c_int;
@@ -89,12 +100,25 @@ foreign c from "libncursesw.so.6" begin
     function clearok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
     function leaveok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
     function touchwin(window: c_ptr(NCWindow)): c_int;
+    function touchline(window: c_ptr(NCWindow), start: c_int, count: c_int): c_int;
+    function wtouchln(window: c_ptr(NCWindow), y: c_int, count: c_int, changed: c_int): c_int;
+    procedure wsyncup(window: c_ptr(NCWindow));
+    procedure wsyncdown(window: c_ptr(NCWindow));
+    procedure wcursyncup(window: c_ptr(NCWindow));
+    function syncok(window: c_ptr(NCWindow), enabled: c_bool): c_int;
+    function wgetparent(window: c_ptr(NCWindow)): c_ptr(NCWindow);
+    function wgetdelay(window: c_ptr(NCWindow)): c_int;
+    function wgetscrreg(window: c_ptr(NCWindow), top: c_ptr(c_int), bottom: c_ptr(c_int)): c_int;
     function untouchwin(window: c_ptr(NCWindow)): c_int;
     function is_linetouched(window: c_ptr(NCWindow), line: c_int): c_bool;
     function is_wintouched(window: c_ptr(NCWindow)): c_bool;
     function wscrl(window: c_ptr(NCWindow), lines: c_int): c_int;
     function wsetscrreg(window: c_ptr(NCWindow), top: c_int, bottom: c_int): c_int;
 
+    function newpad(lines: c_int, columns: c_int): c_ptr(NCWindow);
+    function subpad(parent: c_ptr(NCWindow), lines: c_int, columns: c_int, beginY: c_int, beginX: c_int): c_ptr(NCWindow);
+    function prefresh(pad: c_ptr(NCWindow), pminrow: c_int, pmincol: c_int, sminrow: c_int, smincol: c_int, smaxrow: c_int, smaxcol: c_int): c_int;
+    function pnoutrefresh(pad: c_ptr(NCWindow), pminrow: c_int, pmincol: c_int, sminrow: c_int, smincol: c_int, smaxrow: c_int, smaxcol: c_int): c_int;
     function resizeterm(lines: c_int, columns: c_int): c_int;
     function resize_term(lines: c_int, columns: c_int): c_int;
     function is_term_resized(lines: c_int, columns: c_int): c_bool;

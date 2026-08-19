@@ -1,9 +1,0 @@
-integer function Add(integer left, integer right);
-begin
-    return left + right
-end;
-
-begin
-    future(integer) work;
-    work :- spawn Add(1, 2)
-end;

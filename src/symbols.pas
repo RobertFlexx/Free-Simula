@@ -879,6 +879,9 @@ begin
   AddBuiltinRoutine(Table, 'gc_live_bytes', FSIM_TYPE_INTEGER, []);
   AddBuiltinRoutine(Table, 'gc_reclaimed_bytes', FSIM_TYPE_INTEGER, []);
   AddBuiltinRoutine(Table, 'gc_collection_count', FSIM_TYPE_INTEGER, []);
+  AddBuiltinRoutine(Table, 'gc_last_pause_ns', FSIM_TYPE_INTEGER, []);
+  AddBuiltinRoutine(Table, 'gc_max_pause_ns', FSIM_TYPE_INTEGER, []);
+  AddBuiltinRoutine(Table, 'gc_total_pause_ns', FSIM_TYPE_INTEGER, []);
 
   AddBuiltinRoutine(Table, 'atomic_load', FSIM_TYPE_INTEGER,
     [FSIM_TYPE_ATOMIC]);

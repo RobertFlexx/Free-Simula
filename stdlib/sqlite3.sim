@@ -1,0 +1,101 @@
+module SQLite3;
+
+const integer SQLITE_OK = 0;
+const integer SQLITE_ERROR = 1;
+const integer SQLITE_INTERNAL = 2;
+const integer SQLITE_PERM = 3;
+const integer SQLITE_ABORT = 4;
+const integer SQLITE_BUSY = 5;
+const integer SQLITE_LOCKED = 6;
+const integer SQLITE_NOMEM = 7;
+const integer SQLITE_READONLY = 8;
+const integer SQLITE_INTERRUPT = 9;
+const integer SQLITE_IOERR = 10;
+const integer SQLITE_CORRUPT = 11;
+const integer SQLITE_NOTFOUND = 12;
+const integer SQLITE_FULL = 13;
+const integer SQLITE_CANTOPEN = 14;
+const integer SQLITE_PROTOCOL = 15;
+const integer SQLITE_EMPTY = 16;
+const integer SQLITE_SCHEMA = 17;
+const integer SQLITE_TOOBIG = 18;
+const integer SQLITE_CONSTRAINT = 19;
+const integer SQLITE_MISMATCH = 20;
+const integer SQLITE_MISUSE = 21;
+const integer SQLITE_NOLFS = 22;
+const integer SQLITE_AUTH = 23;
+const integer SQLITE_FORMAT = 24;
+const integer SQLITE_RANGE = 25;
+const integer SQLITE_NOTADB = 26;
+const integer SQLITE_NOTICE = 27;
+const integer SQLITE_WARNING = 28;
+const integer SQLITE_ROW = 100;
+const integer SQLITE_DONE = 101;
+
+const integer SQLITE_OPEN_READONLY = 1;
+const integer SQLITE_OPEN_READWRITE = 2;
+const integer SQLITE_OPEN_CREATE = 4;
+const integer SQLITE_OPEN_URI = 64;
+const integer SQLITE_OPEN_MEMORY = 128;
+const integer SQLITE_OPEN_NOMUTEX = 32768;
+const integer SQLITE_OPEN_FULLMUTEX = 65536;
+
+foreign c opaque record SQLiteDatabase;
+foreign c opaque record SQLiteStatement;
+foreign c opaque record SQLiteValue;
+foreign c opaque record SQLiteContext;
+
+foreign c from "libsqlite3.so.0" begin
+    function sqlite3_libversion(): c_string;
+    function sqlite3_libversion_number(): c_int;
+    function sqlite3_threadsafe(): c_int;
+    function sqlite3_initialize(): c_int;
+    function sqlite3_shutdown(): c_int;
+
+    function sqlite3_open(fileName: c_string, database: c_ptr(c_ptr(SQLiteDatabase))): c_int;
+    function sqlite3_open_v2(fileName: c_string, database: c_ptr(c_ptr(SQLiteDatabase)), flags: c_int, vfs: c_string): c_int;
+    function sqlite3_close(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_close_v2(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_errcode(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_extended_errcode(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_errmsg(database: c_ptr(SQLiteDatabase)): c_string;
+    function sqlite3_errstr(code: c_int): c_string;
+    procedure sqlite3_interrupt(database: c_ptr(SQLiteDatabase));
+    function sqlite3_is_interrupted(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_changes(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_changes64(database: c_ptr(SQLiteDatabase)): c_longlong;
+    function sqlite3_total_changes(database: c_ptr(SQLiteDatabase)): c_int;
+    function sqlite3_last_insert_rowid(database: c_ptr(SQLiteDatabase)): c_longlong;
+    procedure sqlite3_set_last_insert_rowid(database: c_ptr(SQLiteDatabase), rowid: c_longlong);
+    function sqlite3_busy_timeout(database: c_ptr(SQLiteDatabase), milliseconds: c_int): c_int;
+
+    function sqlite3_prepare_v2(database: c_ptr(SQLiteDatabase), sql: c_string, bytes: c_int, statement: c_ptr(c_ptr(SQLiteStatement)), tail: c_ptr(c_string)): c_int;
+    function sqlite3_step(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_reset(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_finalize(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_clear_bindings(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_stmt_readonly(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_stmt_busy(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_sql(statement: c_ptr(SQLiteStatement)): c_string;
+
+    function sqlite3_bind_parameter_count(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_bind_null(statement: c_ptr(SQLiteStatement), index: c_int): c_int;
+    function sqlite3_bind_int(statement: c_ptr(SQLiteStatement), index: c_int, value: c_int): c_int;
+    function sqlite3_bind_int64(statement: c_ptr(SQLiteStatement), index: c_int, value: c_longlong): c_int;
+    function sqlite3_bind_double(statement: c_ptr(SQLiteStatement), index: c_int, value: c_double): c_int;
+    function sqlite3_bind_text(statement: c_ptr(SQLiteStatement), index: c_int, value: c_string, bytes: c_int, destructor: c_ptr(c_void)): c_int;
+
+    function sqlite3_column_count(statement: c_ptr(SQLiteStatement)): c_int;
+    function sqlite3_column_name(statement: c_ptr(SQLiteStatement), column: c_int): c_string;
+    function sqlite3_column_type(statement: c_ptr(SQLiteStatement), column: c_int): c_int;
+    function sqlite3_column_int(statement: c_ptr(SQLiteStatement), column: c_int): c_int;
+    function sqlite3_column_int64(statement: c_ptr(SQLiteStatement), column: c_int): c_longlong;
+    function sqlite3_column_double(statement: c_ptr(SQLiteStatement), column: c_int): c_double;
+    function sqlite3_column_text(statement: c_ptr(SQLiteStatement), column: c_int): c_string;
+    function sqlite3_column_bytes(statement: c_ptr(SQLiteStatement), column: c_int): c_int;
+end;
+
+boolean function SQLiteSucceeded(integer status);
+begin
+    return status = SQLITE_OK
+end;

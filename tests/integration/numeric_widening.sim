@@ -1,8 +1,0 @@
-begin
-    real value;
-    value := 2;
-    outfix(value, 1, 0);
-    outimage;
-    outfix(1 + 2.5, 1, 0);
-    outimage
-end;
