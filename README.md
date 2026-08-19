@@ -20,6 +20,8 @@ Free Simula is also not intended to be Simula 67 frozen in time. Historical faci
 
 The compiler also provides a separate `-std=simula67` mode for historical Standard Simula 67 source.
 
+> Hence not all simula 67 code will compile, its just a simple driver for educational purposes 
+
 `fsim` has its own x86-64 machine-code and ELF backend. Ordinary native output does not pass through generated C, GCC, Clang, LLVM, `as`, or `ld`.
 
 ## Where this came from
