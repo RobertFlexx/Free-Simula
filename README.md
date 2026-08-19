@@ -235,6 +235,9 @@ See [LICENSE](LICENSE).
 ## Credits (me, and others that wish to be anon)
 
 **RobertFlexx** - Project Lead, Software Developer, and Publisher/Maintainer
+
 **Anonymous 1** - Software Developer
+
 **Anonymous 2** - Software Developer, Assistant Lead
+
 **Anonymous 3** - Debugger, Software Developer
