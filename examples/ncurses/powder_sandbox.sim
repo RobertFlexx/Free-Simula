@@ -1,0 +1,2137 @@
+program PowderSandbox;
+import Ncurses;
+
+foreign c record Cell begin
+    element: c_int;
+    life: c_int;
+end;
+
+foreign c record Timespec begin
+    tv_sec: c_long;
+    tv_nsec: c_long;
+end;
+
+foreign c from "libc.so.6" begin
+    function AllocateCells(count: c_size, size: c_size): c_ptr(Cell) = "calloc";
+    procedure FreeCells(pointer: c_ptr(Cell)) = "free";
+    function AllocateBytes(count: c_size, size: c_size): c_ptr(c_uchar) = "calloc";
+    procedure FreeBytes(pointer: c_ptr(c_uchar)) = "free";
+    function clock_gettime(clock_id: c_int, value: c_ptr(Timespec)): c_int;
+end;
+
+const integer EMPTY = 0;
+const integer SAND = 1;
+const integer GUNPOWDER = 2;
+const integer ASH = 3;
+const integer SNOW = 4;
+const integer WATER = 5;
+const integer SALTWATER = 6;
+const integer OIL = 7;
+const integer ETHANOL = 8;
+const integer ACID = 9;
+const integer LAVA = 10;
+const integer MERCURY = 11;
+const integer STONE = 12;
+const integer GLASS = 13;
+const integer WALL = 14;
+const integer WOOD = 15;
+const integer PLANT = 16;
+const integer METAL = 17;
+const integer WIRE = 18;
+const integer ICE = 19;
+const integer COAL = 20;
+const integer DIRT = 21;
+const integer WET_DIRT = 22;
+const integer SEAWEED = 23;
+const integer SMOKE = 24;
+const integer STEAM = 25;
+const integer GAS = 26;
+const integer TOXIC_GAS = 27;
+const integer HYDROGEN = 28;
+const integer CHLORINE = 29;
+const integer FIRE = 30;
+const integer LIGHTNING = 31;
+const integer HUMAN = 32;
+const integer ZOMBIE = 33;
+
+const integer POWDERS = 0;
+const integer LIQUIDS = 1;
+const integer SOLIDS = 2;
+const integer GASES = 3;
+const integer SPECIAL = 4;
+const integer CREDITS = 5;
+const integer TAB_COUNT = 6;
+
+const integer A_REVERSE = 262144;
+const long integer U32_MASK = 4294967295;
+const long integer RNG_RANGE = 1073741824;
+
+Class PowderSandboxApp;
+begin
+    Private:
+    integer gWidth;
+    integer gHeight;
+    c_ptr(Cell) grid;
+    c_ptr(c_uchar) updated;
+    boolean gridReady;
+    array[1:624] long integer mtState;
+    integer mtIndex;
+
+    integer function MaxInt(integer a, integer b);
+    begin
+        if a > b then return a;
+        return b
+    end;
+
+    integer function MinInt(integer a, integer b);
+    begin
+        if a < b then return a;
+        return b
+    end;
+
+    integer function ClampInt(integer value, integer lowValue, integer highValue);
+    begin
+        if value < lowValue then return lowValue;
+        if value > highValue then return highValue;
+        return value
+    end;
+
+    integer function CellIndex(integer x, integer y);
+    begin
+        return y * gWidth + x
+    end;
+
+    boolean function InBounds(integer x, integer y);
+    begin
+        return (x >= 0) and then (x < gWidth) and then (y >= 0) and then (y < gHeight)
+    end;
+
+    integer function GetType(integer index);
+    begin
+        Cell value;
+        value := grid.offset(index).load();
+        return integer(value.element)
+    end;
+
+    integer function GetLife(integer index);
+    begin
+        Cell value;
+        value := grid.offset(index).load();
+        return integer(value.life)
+    end;
+
+    procedure PutCell(integer index, integer element, integer life);
+    begin
+        Cell value;
+        value.element := c_int(element);
+        value.life := c_int(life);
+        grid.offset(index).store(value)
+    end;
+
+    procedure SetType(integer index, integer element);
+    begin
+        Cell value;
+        value := grid.offset(index).load();
+        value.element := c_int(element);
+        grid.offset(index).store(value)
+    end;
+
+    procedure SetLife(integer index, integer life);
+    begin
+        Cell value;
+        value := grid.offset(index).load();
+        value.life := c_int(life);
+        grid.offset(index).store(value)
+    end;
+
+    boolean function IsUpdated(integer index);
+    begin
+        return updated.offset(index).load() <> c_uchar(0)
+    end;
+
+    procedure MarkUpdated(integer index);
+    begin
+        updated.offset(index).store(c_uchar(1))
+    end;
+
+    procedure SeedRng(long integer seed);
+    begin
+        integer i;
+        long integer previous;
+        mtState[1] := seed and U32_MASK;
+        i := 2;
+        while i <= 624 do
+        begin
+            previous := mtState[i - 1];
+            mtState[i] := (1812433253 * (previous xor (previous shr 30)) + (i - 1)) and U32_MASK;
+            i := i + 1
+        end;
+        mtIndex := 625
+    end;
+
+    procedure TwistRng;
+    begin
+        integer i;
+        integer nextIndex;
+        integer mixIndex;
+        long integer y;
+        long integer value;
+        i := 1;
+        while i <= 624 do
+        begin
+            nextIndex := i + 1;
+            if nextIndex > 624 then nextIndex := 1;
+            mixIndex := i + 397;
+            if mixIndex > 624 then mixIndex := mixIndex - 624;
+            y := (mtState[i] and 2147483648) + (mtState[nextIndex] and 2147483647);
+            value := mtState[mixIndex] xor (y shr 1);
+            if (y and 1) <> 0 then value := value xor 2567483615;
+            mtState[i] := value and U32_MASK;
+            i := i + 1
+        end;
+        mtIndex := 1
+    end;
+
+    long integer function RandomU32;
+    begin
+        long integer y;
+        if mtIndex > 624 then TwistRng;
+        y := mtState[mtIndex];
+        mtIndex := mtIndex + 1;
+        y := y xor (y shr 11);
+        y := y xor ((y shl 7) and 2636928640);
+        y := y xor ((y shl 15) and 4022730752);
+        y := y xor (y shr 18);
+        return y and U32_MASK
+    end;
+
+    integer function RInt(integer lowValue, integer highValue);
+    begin
+        long integer span;
+        long integer limit;
+        long integer value;
+        span := long integer(highValue - lowValue + 1);
+        limit := RNG_RANGE - (RNG_RANGE mod span);
+        value := RandomU32 and 1073741823;
+        while value >= limit do value := RandomU32 and 1073741823;
+        return lowValue + integer(value mod span)
+    end;
+
+    boolean function Chance(integer percent);
+    begin
+        return RInt(1, 100) <= percent
+    end;
+
+    boolean function Sandlike(integer element);
+    begin
+        return (element = SAND) or else (element = GUNPOWDER) or else (element = ASH) or else (element = SNOW)
+    end;
+
+    boolean function Liquid(integer element);
+    begin
+        return (element = WATER) or else (element = SALTWATER) or else (element = OIL) or else
+               (element = ETHANOL) or else (element = ACID) or else (element = LAVA) or else
+               (element = MERCURY)
+    end;
+
+    boolean function Solid(integer element);
+    begin
+        return (element = STONE) or else (element = GLASS) or else (element = WALL) or else
+               (element = WOOD) or else (element = PLANT) or else (element = METAL) or else
+               (element = WIRE) or else (element = ICE) or else (element = COAL) or else
+               (element = DIRT) or else (element = WET_DIRT) or else (element = SEAWEED)
+    end;
+
+    boolean function Gas(integer element);
+    begin
+        return (element = SMOKE) or else (element = STEAM) or else (element = GAS) or else
+               (element = TOXIC_GAS) or else (element = HYDROGEN) or else (element = CHLORINE)
+    end;
+
+    boolean function Flammable(integer element);
+    begin
+        return (element = WOOD) or else (element = PLANT) or else (element = OIL) or else
+               (element = ETHANOL) or else (element = GUNPOWDER) or else (element = COAL) or else
+               (element = SEAWEED)
+    end;
+
+    boolean function Conductor(integer element);
+    begin
+        return (element = METAL) or else (element = WIRE) or else (element = MERCURY) or else
+               (element = SALTWATER)
+    end;
+
+    boolean function Dissolvable(integer element);
+    begin
+        return (element = SAND) or else (element = STONE) or else (element = GLASS) or else
+               (element = WOOD) or else (element = PLANT) or else (element = METAL) or else
+               (element = WIRE) or else (element = ASH) or else (element = COAL) or else
+               (element = SEAWEED) or else (element = DIRT) or else (element = WET_DIRT)
+    end;
+
+    integer function Density(integer element);
+    begin
+        if element = ETHANOL then return 85;
+        if element = OIL then return 90;
+        if (element = GAS) or else (element = HYDROGEN) then return 1;
+        if element = STEAM then return 2;
+        if element = SMOKE then return 3;
+        if element = CHLORINE then return 5;
+        if element = WATER then return 100;
+        if element = SALTWATER then return 103;
+        if element = ACID then return 110;
+        if element = LAVA then return 160;
+        if element = MERCURY then return 200;
+        return 999
+    end;
+
+    boolean function IsHazard(integer element);
+    begin
+        return (element = FIRE) or else (element = LAVA) or else (element = ACID) or else
+               (element = TOXIC_GAS) or else (element = CHLORINE) or else (element = LIGHTNING)
+    end;
+
+    string function NameOf(integer element);
+    begin
+        if element = EMPTY then return "Empty";
+        if element = SAND then return "Sand";
+        if element = GUNPOWDER then return "Gunpowder";
+        if element = ASH then return "Ash";
+        if element = SNOW then return "Snow";
+        if element = WATER then return "Water";
+        if element = SALTWATER then return "Salt Water";
+        if element = OIL then return "Oil";
+        if element = ETHANOL then return "Ethanol";
+        if element = ACID then return "Acid";
+        if element = LAVA then return "Lava";
+        if element = MERCURY then return "Mercury";
+        if element = STONE then return "Stone";
+        if element = GLASS then return "Glass";
+        if element = WALL then return "Wall";
+        if element = WOOD then return "Wood";
+        if element = PLANT then return "Plant";
+        if element = METAL then return "Metal";
+        if element = WIRE then return "Wire";
+        if element = ICE then return "Ice";
+        if element = COAL then return "Coal";
+        if element = DIRT then return "Dirt";
+        if element = WET_DIRT then return "Wet Dirt";
+        if element = SEAWEED then return "Seaweed";
+        if element = SMOKE then return "Smoke";
+        if element = STEAM then return "Steam";
+        if element = GAS then return "Gas";
+        if element = TOXIC_GAS then return "Toxic Gas";
+        if element = HYDROGEN then return "Hydrogen";
+        if element = CHLORINE then return "Chlorine";
+        if element = FIRE then return "Fire";
+        if element = LIGHTNING then return "Lightning";
+        if element = HUMAN then return "Human";
+        if element = ZOMBIE then return "Zombie";
+        return "?"
+    end;
+
+    integer function ColorOf(integer element);
+    begin
+        if element = EMPTY then return 1;
+        if (element = SAND) or else (element = GUNPOWDER) or else (element = SNOW) or else (element = DIRT) then return 2;
+        if (element = WATER) or else (element = SALTWATER) or else (element = STEAM) or else
+           (element = ICE) or else (element = ETHANOL) then return 3;
+        if (element = STONE) or else (element = GLASS) or else (element = WALL) or else
+           (element = METAL) or else (element = WIRE) or else (element = COAL) or else
+           (element = WET_DIRT) then return 4;
+        if (element = WOOD) or else (element = PLANT) or else (element = SEAWEED) or else (element = HUMAN) then return 5;
+        if (element = FIRE) or else (element = LAVA) or else (element = ZOMBIE) then return 6;
+        if (element = SMOKE) or else (element = ASH) or else (element = GAS) or else (element = HYDROGEN) then return 7;
+        if (element = OIL) or else (element = MERCURY) then return 8;
+        if (element = ACID) or else (element = TOXIC_GAS) or else (element = CHLORINE) or else (element = LIGHTNING) then return 9;
+        return 1
+    end;
+
+    integer function GlyphOf(integer element);
+    begin
+        if element = EMPTY then return 32;
+        if element = SAND then return 46;
+        if element = GUNPOWDER then return 37;
+        if element = ASH then return 59;
+        if element = SNOW then return 44;
+        if element = WATER then return 126;
+        if element = SALTWATER then return 58;
+        if element = OIL then return 111;
+        if element = ETHANOL then return 101;
+        if element = ACID then return 97;
+        if element = LAVA then return 76;
+        if element = MERCURY then return 109;
+        if element = STONE then return 35;
+        if element = GLASS then return 61;
+        if element = WALL then return 64;
+        if element = WOOD then return 119;
+        if element = PLANT then return 112;
+        if element = SEAWEED then return 118;
+        if element = METAL then return 77;
+        if element = WIRE then return 45;
+        if element = ICE then return 73;
+        if element = COAL then return 99;
+        if element = DIRT then return 100;
+        if element = WET_DIRT then return 68;
+        if element = SMOKE then return 94;
+        if element = STEAM then return 34;
+        if element = GAS then return 96;
+        if element = TOXIC_GAS then return 120;
+        if element = HYDROGEN then return 39;
+        if element = CHLORINE then return 88;
+        if element = FIRE then return 42;
+        if element = LIGHTNING then return 124;
+        if element = HUMAN then return 89;
+        if element = ZOMBIE then return 84;
+        return 63
+    end;
+
+    procedure InitGrid(integer width, integer height);
+    begin
+        integer count;
+        if gridReady then FreeCells(grid);
+        gWidth := width;
+        gHeight := height;
+        count := gWidth * gHeight;
+        grid := AllocateCells(c_size(count), c_sizeof(Cell));
+        if grid = c_ptr(Cell)(0) then
+        begin
+            endwin();
+            outtext("powder sandbox: unable to allocate grid");
+            outimage;
+            exit(1)
+        end;
+        gridReady := true
+    end;
+
+    procedure ClearGrid;
+    begin
+        integer i;
+        integer count;
+        count := gWidth * gHeight;
+        i := 0;
+        while i < count do
+        begin
+            PutCell(i, EMPTY, 0);
+            i := i + 1
+        end
+    end;
+
+    procedure Explode(integer cx, integer cy, integer radius);
+    begin
+        integer dx;
+        integer dy;
+        integer x;
+        integer y;
+        integer index;
+        integer element;
+        integer roll;
+        dy := -radius;
+        while dy <= radius do
+        begin
+            dx := -radius;
+            while dx <= radius do
+            begin
+                x := cx + dx;
+                y := cy + dy;
+                if InBounds(x, y) and then ((dx * dx + dy * dy) <= (radius * radius)) then
+                begin
+                    index := CellIndex(x, y);
+                    element := GetType(index);
+                    if (element <> WALL) and then (element <> STONE) and then (element <> GLASS) and then
+                       (element <> METAL) and then (element <> WIRE) and then (element <> ICE) then
+                    begin
+                        roll := RInt(1, 100);
+                        if roll <= 50 then PutCell(index, FIRE, 15 + RInt(0, 10))
+                        else if roll <= 80 then PutCell(index, SMOKE, 20)
+                        else PutCell(index, GAS, 20)
+                    end
+                end;
+                dx := dx + 1
+            end;
+            dy := dy + 1
+        end
+    end;
+
+    procedure PlaceBrush(integer cx, integer cy, integer radius, integer element);
+    begin
+        integer x;
+        integer y;
+        integer yy;
+        integer dx;
+        integer dy;
+        integer index;
+        integer belowIndex;
+        integer life;
+        if element = LIGHTNING then
+        begin
+            if not InBounds(cx, cy) then return;
+            x := cx;
+            y := cy;
+            while (y + 1) < gHeight and then
+                  ((GetType(CellIndex(x, y + 1)) = EMPTY) or else Gas(GetType(CellIndex(x, y + 1)))) do
+                y := y + 1;
+            yy := cy;
+            while yy <= y do
+            begin
+                PutCell(CellIndex(x, yy), LIGHTNING, 2);
+                yy := yy + 1
+            end;
+            if (y + 1) < gHeight then
+            begin
+                belowIndex := CellIndex(x, y + 1);
+                if (GetType(belowIndex) = WATER) or else (GetType(belowIndex) = SALTWATER) then
+                begin
+                    life := GetLife(belowIndex);
+                    if life < 8 then SetLife(belowIndex, 8)
+                end
+            end;
+            return
+        end;
+
+        dy := -radius;
+        while dy <= radius do
+        begin
+            dx := -radius;
+            while dx <= radius do
+            begin
+                x := cx + dx;
+                y := cy + dy;
+                if InBounds(x, y) and then ((dx * dx + dy * dy) <= (radius * radius)) then
+                begin
+                    index := CellIndex(x, y);
+                    PutCell(index, element, 0);
+                    if Gas(element) then SetLife(index, 25);
+                    if element = FIRE then SetLife(index, 20)
+                end;
+                dx := dx + 1
+            end;
+            dy := dy + 1
+        end
+    end;
+
+    procedure SwapTo(integer currentIndex, integer nx, integer ny);
+    begin
+        integer targetIndex;
+        Cell currentCell;
+        Cell targetCell;
+        targetIndex := CellIndex(nx, ny);
+        currentCell := grid.offset(currentIndex).load();
+        targetCell := grid.offset(targetIndex).load();
+        grid.offset(targetIndex).store(currentCell);
+        grid.offset(currentIndex).store(targetCell);
+        MarkUpdated(targetIndex)
+    end;
+
+    procedure SwapRaw(integer firstIndex, integer secondIndex);
+    begin
+        Cell firstCell;
+        Cell secondCell;
+        firstCell := grid.offset(firstIndex).load();
+        secondCell := grid.offset(secondIndex).load();
+        grid.offset(secondIndex).store(firstCell);
+        grid.offset(firstIndex).store(secondCell)
+    end;
+
+    boolean function WalkTry(integer currentIndex, integer tx, integer ty);
+    begin
+        integer targetIndex;
+        integer targetType;
+        if not InBounds(tx, ty) then return false;
+        targetIndex := CellIndex(tx, ty);
+        targetType := GetType(targetIndex);
+        if (targetType = EMPTY) or else Gas(targetType) then
+        begin
+            SwapRaw(currentIndex, targetIndex);
+            return true
+        end;
+        return false
+    end;
+
+    procedure ProcessCell(integer x, integer y, integer currentIndex);
+    begin
+        integer t;
+        integer belowIndex;
+        integer neighborIndex;
+        integer targetIndex;
+        integer neighborType;
+        integer belowType;
+        integer nx;
+        integer ny;
+        integer dx;
+        integer dy;
+        integer wx;
+        integer wy;
+        integer sx;
+        integer sy;
+        integer dir;
+        integer dir1;
+        integer dir2;
+        integer tempDir;
+        integer attempt;
+        integer tries;
+        integer q;
+        integer zx;
+        integer zy;
+        integer hx;
+        integer hy;
+        integer rx;
+        integer ry;
+        integer life;
+        boolean moved;
+        boolean nearbyWeed;
+        boolean killed;
+        boolean seen;
+        boolean nearWater;
+        boolean goodSoil;
+        boolean underwater;
+        boolean isTop;
+
+        t := GetType(currentIndex);
+        if (t = EMPTY) or else (t = WALL) then
+        begin
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if Sandlike(t) then
+        begin
+            moved := false;
+            if InBounds(x, y + 1) then
+            begin
+                belowIndex := CellIndex(x, y + 1);
+                belowType := GetType(belowIndex);
+                if (belowType = EMPTY) or else Liquid(belowType) then
+                begin
+                    SwapTo(currentIndex, x, y + 1);
+                    moved := true
+                end
+            end;
+            if not moved then
+            begin
+                if RInt(0, 1) <> 0 then dir := 1 else dir := -1;
+                attempt := 0;
+                while (attempt < 2) and then (not moved) do
+                begin
+                    if attempt = 0 then nx := x + dir else nx := x - dir;
+                    ny := y + 1;
+                    if InBounds(nx, ny) then
+                    begin
+                        targetIndex := CellIndex(nx, ny);
+                        neighborType := GetType(targetIndex);
+                        if (neighborType = EMPTY) or else Liquid(neighborType) then
+                        begin
+                            SwapTo(currentIndex, nx, ny);
+                            moved := true
+                        end
+                    end;
+                    attempt := attempt + 1
+                end
+            end;
+            if not moved then MarkUpdated(currentIndex);
+
+            if t = SNOW then
+            begin
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborType := GetType(CellIndex(nx, ny));
+                            if (neighborType = FIRE) or else (neighborType = LAVA) then PutCell(currentIndex, WATER, 0)
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end
+            end;
+
+            if t = SAND then
+            begin
+                if InBounds(x, y - 1) and then (GetType(CellIndex(x, y - 1)) = WATER) then
+                begin
+                    SetLife(currentIndex, GetLife(currentIndex) + 1);
+                    if GetLife(currentIndex) > 220 then
+                    begin
+                        nearbyWeed := false;
+                        wy := -2;
+                        while (wy <= 2) and then (not nearbyWeed) do
+                        begin
+                            wx := -2;
+                            while (wx <= 2) and then (not nearbyWeed) do
+                            begin
+                                sx := x + wx;
+                                sy := y + wy;
+                                if InBounds(sx, sy) then
+                                begin
+                                    if GetType(CellIndex(sx, sy)) = SEAWEED then nearbyWeed := true
+                                end;
+                                wx := wx + 1
+                            end;
+                            wy := wy + 1
+                        end;
+                        if (not nearbyWeed) and then InBounds(x, y - 1) and then
+                           (GetType(CellIndex(x, y - 1)) = WATER) then
+                            PutCell(CellIndex(x, y - 1), SEAWEED, 0);
+                        SetLife(currentIndex, 0)
+                    end
+                end
+                else SetLife(currentIndex, 0)
+            end;
+            return
+        end;
+
+        if Liquid(t) then
+        begin
+            moved := false;
+            if InBounds(x, y + 1) then
+            begin
+                belowIndex := CellIndex(x, y + 1);
+                belowType := GetType(belowIndex);
+                if (belowType = EMPTY) or else Gas(belowType) then
+                begin
+                    SwapTo(currentIndex, x, y + 1);
+                    moved := true
+                end
+                else if Liquid(belowType) and then (Density(t) > Density(belowType)) then
+                begin
+                    SwapTo(currentIndex, x, y + 1);
+                    moved := true
+                end
+            end;
+
+            if not moved then
+            begin
+                dir1 := -1;
+                dir2 := 1;
+                if RInt(0, 1) <> 0 then
+                begin
+                    tempDir := dir1;
+                    dir1 := dir2;
+                    dir2 := tempDir
+                end;
+                attempt := 0;
+                while (attempt < 2) and then (not moved) do
+                begin
+                    if attempt = 0 then nx := x + dir1 else nx := x + dir2;
+                    if InBounds(nx, y) then
+                    begin
+                        targetIndex := CellIndex(nx, y);
+                        neighborType := GetType(targetIndex);
+                        if (neighborType = EMPTY) or else Gas(neighborType) then
+                        begin
+                            SwapTo(currentIndex, nx, y);
+                            moved := true
+                        end
+                        else if Liquid(neighborType) and then (Density(t) > Density(neighborType)) and then Chance(50) then
+                        begin
+                            SwapTo(currentIndex, nx, y);
+                            moved := true
+                        end
+                    end;
+                    attempt := attempt + 1
+                end
+            end;
+
+            if not moved then MarkUpdated(currentIndex);
+
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+
+                            if (t = WATER) or else (t = SALTWATER) then
+                            begin
+                                neighborType := GetType(neighborIndex);
+                                if neighborType = FIRE then PutCell(neighborIndex, SMOKE, 15)
+                                else if neighborType = LAVA then
+                                begin
+                                    PutCell(neighborIndex, STONE, 0);
+                                    if Chance(50) then PutCell(currentIndex, STEAM, 20)
+                                    else PutCell(currentIndex, STONE, 0)
+                                end
+                            end;
+
+                            if (t = OIL) or else (t = ETHANOL) then
+                            begin
+                                neighborType := GetType(neighborIndex);
+                                if (neighborType = FIRE) or else (neighborType = LAVA) then PutCell(currentIndex, FIRE, 25)
+                            end;
+
+                            if t = ACID then
+                            begin
+                                neighborType := GetType(neighborIndex);
+                                if Dissolvable(neighborType) then
+                                begin
+                                    if Chance(30) then PutCell(neighborIndex, TOXIC_GAS, 25)
+                                    else PutCell(neighborIndex, EMPTY, 0);
+                                    if Chance(25) then PutCell(currentIndex, EMPTY, 0)
+                                end;
+                                if (GetType(neighborIndex) = WATER) and then Chance(30) then
+                                begin
+                                    PutCell(currentIndex, SALTWATER, 0);
+                                    if Chance(30) then PutCell(neighborIndex, STEAM, 20)
+                                end
+                            end;
+
+                            if t = LAVA then
+                            begin
+                                neighborType := GetType(neighborIndex);
+                                if Flammable(neighborType) then PutCell(neighborIndex, FIRE, 25)
+                                else if (neighborType = SAND) or else (neighborType = SNOW) then PutCell(neighborIndex, GLASS, 0)
+                                else if (neighborType = WATER) or else (neighborType = SALTWATER) then
+                                begin
+                                    PutCell(neighborIndex, STONE, 0);
+                                    if Chance(50) then PutCell(currentIndex, STEAM, 20)
+                                    else PutCell(currentIndex, STONE, 0)
+                                end
+                                else if neighborType = ICE then PutCell(neighborIndex, WATER, 0)
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+
+            if t = LAVA then
+            begin
+                SetLife(currentIndex, GetLife(currentIndex) + 1);
+                if GetLife(currentIndex) > 200 then PutCell(currentIndex, STONE, 0)
+            end;
+
+            if (t = WATER) or else (t = SALTWATER) then
+            begin
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            neighborType := GetType(neighborIndex);
+                            if (neighborType = DIRT) or else (neighborType = WET_DIRT) then PutCell(neighborIndex, WET_DIRT, 300)
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end
+            end;
+
+            if ((t = WATER) or else (t = SALTWATER)) and then (GetLife(currentIndex) > 0) then
+            begin
+                q := GetLife(currentIndex);
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        if (dx <> 0) or else (dy <> 0) then
+                        begin
+                            nx := x + dx;
+                            ny := y + dy;
+                            if InBounds(nx, ny) then
+                            begin
+                                neighborIndex := CellIndex(nx, ny);
+                                neighborType := GetType(neighborIndex);
+                                if (neighborType = WATER) or else (neighborType = SALTWATER) then
+                                begin
+                                    if GetLife(neighborIndex) < (q - 1) then SetLife(neighborIndex, q - 1)
+                                end;
+                                neighborType := GetType(neighborIndex);
+                                if (neighborType = HUMAN) or else (neighborType = ZOMBIE) then PutCell(neighborIndex, ASH, 0)
+                            end
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end;
+                SetLife(currentIndex, GetLife(currentIndex) - 1);
+                if GetLife(currentIndex) < 0 then SetLife(currentIndex, 0)
+            end;
+            return
+        end;
+
+        if Gas(t) then
+        begin
+            moved := false;
+            if t = HYDROGEN then tries := 2 else tries := 1;
+            attempt := 0;
+            while (attempt < tries) and then (not moved) do
+            begin
+                if InBounds(x, y - 1) and then (GetType(CellIndex(x, y - 1)) = EMPTY) then
+                begin
+                    SwapTo(currentIndex, x, y - 1);
+                    moved := true
+                end;
+                attempt := attempt + 1
+            end;
+
+            if not moved then
+            begin
+                dir1 := -1;
+                dir2 := 1;
+                if RInt(0, 1) <> 0 then
+                begin
+                    tempDir := dir1;
+                    dir1 := dir2;
+                    dir2 := tempDir
+                end;
+                attempt := 0;
+                while (attempt < 2) and then (not moved) do
+                begin
+                    if attempt = 0 then nx := x + dir1 else nx := x + dir2;
+                    if Chance(50) then ny := y - 1 else ny := y;
+                    if InBounds(nx, ny) and then (GetType(CellIndex(nx, ny)) = EMPTY) then
+                    begin
+                        SwapTo(currentIndex, nx, ny);
+                        moved := true
+                    end;
+                    attempt := attempt + 1
+                end
+            end;
+
+            if (t = HYDROGEN) or else (t = GAS) then
+            begin
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        if (dx <> 0) or else (dy <> 0) then
+                        begin
+                            nx := x + dx;
+                            ny := y + dy;
+                            if InBounds(nx, ny) then
+                            begin
+                                neighborType := GetType(CellIndex(nx, ny));
+                                if (neighborType = FIRE) or else (neighborType = LAVA) then
+                                begin
+                                    if t = HYDROGEN then Explode(x, y, 4)
+                                    else PutCell(currentIndex, FIRE, 12)
+                                end
+                            end
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end
+            end;
+
+            if t = CHLORINE then
+            begin
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            if (GetType(neighborIndex) = PLANT) and then Chance(35) then PutCell(neighborIndex, TOXIC_GAS, 25)
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end
+            end;
+
+            SetLife(currentIndex, GetLife(currentIndex) - 1);
+            if GetLife(currentIndex) <= 0 then
+            begin
+                if (t = STEAM) and then Chance(15) then PutCell(currentIndex, WATER, 0)
+                else if (t = SMOKE) and then Chance(8) then PutCell(currentIndex, ASH, 0)
+                else PutCell(currentIndex, EMPTY, 0)
+            end
+            else if not moved then MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = FIRE then
+        begin
+            if InBounds(x, y - 1) and then
+               ((GetType(CellIndex(x, y - 1)) = EMPTY) or else Gas(GetType(CellIndex(x, y - 1)))) and then Chance(50) then
+                SwapTo(currentIndex, x, y - 1);
+
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            neighborType := GetType(neighborIndex);
+                            if Flammable(neighborType) and then Chance(40) then
+                            begin
+                                if neighborType = GUNPOWDER then Explode(nx, ny, 5)
+                                else PutCell(neighborIndex, FIRE, 15 + RInt(0, 10))
+                            end;
+                            neighborType := GetType(neighborIndex);
+                            if (neighborType = WATER) or else (neighborType = SALTWATER) then PutCell(currentIndex, SMOKE, 15);
+                            neighborType := GetType(neighborIndex);
+                            if (neighborType = WIRE) or else (neighborType = METAL) then
+                            begin
+                                if Chance(5) and then (GetLife(neighborIndex) < 5) then SetLife(neighborIndex, 5)
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            SetLife(currentIndex, GetLife(currentIndex) - 1);
+            if GetLife(currentIndex) <= 0 then PutCell(currentIndex, SMOKE, 15);
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = LIGHTNING then
+        begin
+            dy := -2;
+            while dy <= 2 do
+            begin
+                dx := -2;
+                while dx <= 2 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            neighborType := GetType(neighborIndex);
+                            if (neighborType = WIRE) or else (neighborType = METAL) then
+                            begin
+                                if GetLife(neighborIndex) < 12 then SetLife(neighborIndex, 12)
+                            end;
+                            if (neighborType = WATER) or else (neighborType = SALTWATER) then
+                            begin
+                                if GetLife(neighborIndex) < 8 then SetLife(neighborIndex, 8)
+                            end;
+                            if Flammable(neighborType) then
+                            begin
+                                if neighborType = GUNPOWDER then Explode(nx, ny, 6)
+                                else PutCell(neighborIndex, FIRE, 20 + RInt(0, 10))
+                            end;
+                            if (neighborType = HYDROGEN) or else (neighborType = GAS) then Explode(nx, ny, 4)
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            SetLife(currentIndex, GetLife(currentIndex) - 1);
+            if GetLife(currentIndex) <= 0 then PutCell(currentIndex, EMPTY, 0);
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = HUMAN then
+        begin
+            killed := false;
+            dy := -1;
+            while (dy <= 1) and then (not killed) do
+            begin
+                dx := -1;
+                while (dx <= 1) and then (not killed) do
+                begin
+                    nx := x + dx;
+                    ny := y + dy;
+                    if InBounds(nx, ny) then
+                    begin
+                        neighborIndex := CellIndex(nx, ny);
+                        neighborType := GetType(neighborIndex);
+                        if IsHazard(neighborType) or else
+                           (((neighborType = WATER) or else (neighborType = SALTWATER)) and then (GetLife(neighborIndex) > 0)) then
+                        begin
+                            PutCell(currentIndex, ASH, 0);
+                            killed := true
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            if killed then
+            begin
+                MarkUpdated(currentIndex);
+                return
+            end;
+
+            SetLife(currentIndex, GetLife(currentIndex) + 1);
+
+            if InBounds(x, y + 1) then
+            begin
+                belowIndex := CellIndex(x, y + 1);
+                belowType := GetType(belowIndex);
+                if (belowType = EMPTY) or else Gas(belowType) then
+                begin
+                    SwapTo(currentIndex, x, y + 1);
+                    return
+                end
+            end;
+
+            zx := 0;
+            zy := 0;
+            seen := false;
+            ry := -6;
+            while (ry <= 6) and then (not seen) do
+            begin
+                rx := -6;
+                while (rx <= 6) and then (not seen) do
+                begin
+                    nx := x + rx;
+                    ny := y + ry;
+                    if InBounds(nx, ny) and then (GetType(CellIndex(nx, ny)) = ZOMBIE) then
+                    begin
+                        zx := nx;
+                        zy := ny;
+                        seen := true
+                    end;
+                    rx := rx + 1
+                end;
+                ry := ry + 1
+            end;
+
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            if (GetType(neighborIndex) = ZOMBIE) and then Chance(35) then
+                            begin
+                                if Chance(60) then PutCell(neighborIndex, FIRE, 10 + RInt(0, 10))
+                                else PutCell(neighborIndex, ASH, 0)
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+
+            if RInt(0, 1) <> 0 then dir := 1 else dir := -1;
+            if seen then
+            begin
+                if zx < x then dir := 1 else dir := -1
+            end;
+
+            if not WalkTry(currentIndex, x + dir, y) then
+            begin
+                if InBounds(x + dir, y - 1) and then (GetType(CellIndex(x + dir, y - 1)) = EMPTY) and then
+                   (GetType(CellIndex(x, y - 1)) = EMPTY) and then Chance(70) then
+                begin
+                    SwapRaw(currentIndex, CellIndex(x, y - 1))
+                end
+                else
+                begin
+                    if RInt(0, 1) <> 0 then tempDir := 1 else tempDir := -1;
+                    WalkTry(currentIndex, x + tempDir, y)
+                end
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = ZOMBIE then
+        begin
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    nx := x + dx;
+                    ny := y + dy;
+                    if InBounds(nx, ny) then
+                    begin
+                        neighborIndex := CellIndex(nx, ny);
+                        neighborType := GetType(neighborIndex);
+                        if IsHazard(neighborType) or else
+                           (((neighborType = WATER) or else (neighborType = SALTWATER)) and then (GetLife(neighborIndex) > 0)) then
+                            PutCell(currentIndex, FIRE, 15)
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+
+            if GetType(currentIndex) <> ZOMBIE then
+            begin
+                MarkUpdated(currentIndex);
+                return
+            end;
+
+            SetLife(currentIndex, GetLife(currentIndex) + 1);
+
+            if InBounds(x, y + 1) then
+            begin
+                belowIndex := CellIndex(x, y + 1);
+                belowType := GetType(belowIndex);
+                if (belowType = EMPTY) or else Gas(belowType) then
+                begin
+                    SwapTo(currentIndex, x, y + 1);
+                    return
+                end
+            end;
+
+            hx := 0;
+            hy := 0;
+            seen := false;
+            ry := -6;
+            while (ry <= 6) and then (not seen) do
+            begin
+                rx := -6;
+                while (rx <= 6) and then (not seen) do
+                begin
+                    nx := x + rx;
+                    ny := y + ry;
+                    if InBounds(nx, ny) and then (GetType(CellIndex(nx, ny)) = HUMAN) then
+                    begin
+                        hx := nx;
+                        hy := ny;
+                        seen := true
+                    end;
+                    rx := rx + 1
+                end;
+                ry := ry + 1
+            end;
+
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborIndex := CellIndex(nx, ny);
+                            if GetType(neighborIndex) = HUMAN then
+                            begin
+                                if Chance(70) then PutCell(neighborIndex, ZOMBIE, 0)
+                                else PutCell(neighborIndex, FIRE, 10)
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+
+            if seen then
+            begin
+                if hx > x then dir := 1 else dir := -1
+            end
+            else
+            begin
+                if RInt(0, 1) <> 0 then dir := 1 else dir := -1
+            end;
+
+            if not WalkTry(currentIndex, x + dir, y) then
+            begin
+                if InBounds(x + dir, y - 1) and then (GetType(CellIndex(x + dir, y - 1)) = EMPTY) and then
+                   (GetType(CellIndex(x, y - 1)) = EMPTY) and then Chance(70) then
+                begin
+                    SwapRaw(currentIndex, CellIndex(x, y - 1))
+                end
+                else
+                begin
+                    if RInt(0, 1) <> 0 then tempDir := 1 else tempDir := -1;
+                    WalkTry(currentIndex, x + tempDir, y)
+                end
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = WET_DIRT then
+        begin
+            nearWater := false;
+            dy := -1;
+            while (dy <= 1) and then (not nearWater) do
+            begin
+                dx := -1;
+                while (dx <= 1) and then (not nearWater) do
+                begin
+                    nx := x + dx;
+                    ny := y + dy;
+                    if InBounds(nx, ny) then
+                    begin
+                        neighborType := GetType(CellIndex(nx, ny));
+                        if (neighborType = WATER) or else (neighborType = SALTWATER) then nearWater := true
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            if not nearWater then
+            begin
+                SetLife(currentIndex, GetLife(currentIndex) - 1);
+                if GetLife(currentIndex) <= 0 then PutCell(currentIndex, DIRT, 0)
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if (t = PLANT) or else (t = SEAWEED) then
+        begin
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborType := GetType(CellIndex(nx, ny));
+                            if (neighborType = FIRE) or else (neighborType = LAVA) then PutCell(currentIndex, FIRE, 20)
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+
+            if GetType(currentIndex) = FIRE then
+            begin
+                MarkUpdated(currentIndex);
+                return
+            end;
+
+            if t = PLANT then
+            begin
+                goodSoil := InBounds(x, y + 1) and then (GetType(CellIndex(x, y + 1)) = WET_DIRT);
+                if goodSoil and then Chance(2) then
+                begin
+                    nx := x;
+                    ny := y - 1;
+                    if InBounds(nx, ny) and then (GetType(CellIndex(nx, ny)) = EMPTY) then PutCell(CellIndex(nx, ny), PLANT, 0)
+                end
+            end
+            else
+            begin
+                underwater := InBounds(x, y - 1) and then
+                              ((GetType(CellIndex(x, y - 1)) = WATER) or else (GetType(CellIndex(x, y - 1)) = SALTWATER));
+                isTop := (not InBounds(x, y - 1)) or else (GetType(CellIndex(x, y - 1)) <> SEAWEED);
+                if underwater and then isTop and then Chance(2) then
+                begin
+                    ny := y - 1;
+                    if InBounds(x, ny) and then
+                       ((GetType(CellIndex(x, ny)) = WATER) or else (GetType(CellIndex(x, ny)) = SALTWATER)) then
+                        PutCell(CellIndex(x, ny), SEAWEED, 0)
+                end
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if (t = WOOD) or else (t = COAL) then
+        begin
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborType := GetType(CellIndex(nx, ny));
+                            if (neighborType = FIRE) or else (neighborType = LAVA) then
+                            begin
+                                if t = COAL then PutCell(currentIndex, FIRE, 35)
+                                else PutCell(currentIndex, FIRE, 25)
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = GUNPOWDER then
+        begin
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    if (dx <> 0) or else (dy <> 0) then
+                    begin
+                        nx := x + dx;
+                        ny := y + dy;
+                        if InBounds(nx, ny) then
+                        begin
+                            neighborType := GetType(CellIndex(nx, ny));
+                            if (neighborType = FIRE) or else (neighborType = LAVA) then
+                            begin
+                                Explode(x, y, 5);
+                                dx := 2
+                            end
+                        end
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if (t = WIRE) or else (t = METAL) then
+        begin
+            if GetLife(currentIndex) > 0 then
+            begin
+                q := GetLife(currentIndex);
+                dy := -1;
+                while dy <= 1 do
+                begin
+                    dx := -1;
+                    while dx <= 1 do
+                    begin
+                        if (dx <> 0) or else (dy <> 0) then
+                        begin
+                            nx := x + dx;
+                            ny := y + dy;
+                            if InBounds(nx, ny) then
+                            begin
+                                neighborIndex := CellIndex(nx, ny);
+                                neighborType := GetType(neighborIndex);
+                                if (neighborType = WIRE) or else (neighborType = METAL) then
+                                begin
+                                    if GetLife(neighborIndex) < (q - 1) then SetLife(neighborIndex, q - 1)
+                                end;
+                                neighborType := GetType(neighborIndex);
+                                if (neighborType = WATER) or else (neighborType = SALTWATER) then
+                                begin
+                                    if GetLife(neighborIndex) < (q - 1) then SetLife(neighborIndex, q - 1)
+                                end;
+                                neighborType := GetType(neighborIndex);
+                                if Flammable(neighborType) and then Chance(15) then
+                                begin
+                                    if neighborType = GUNPOWDER then Explode(nx, ny, 5)
+                                    else PutCell(neighborIndex, FIRE, 15 + RInt(0, 10))
+                                end;
+                                neighborType := GetType(neighborIndex);
+                                if ((neighborType = HYDROGEN) or else (neighborType = GAS)) and then Chance(35) then Explode(nx, ny, 4)
+                            end
+                        end;
+                        dx := dx + 1
+                    end;
+                    dy := dy + 1
+                end;
+                SetLife(currentIndex, GetLife(currentIndex) - 1);
+                if GetLife(currentIndex) < 0 then SetLife(currentIndex, 0)
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        if t = ICE then
+        begin
+            dy := -1;
+            while dy <= 1 do
+            begin
+                dx := -1;
+                while dx <= 1 do
+                begin
+                    nx := x + dx;
+                    ny := y + dy;
+                    if InBounds(nx, ny) then
+                    begin
+                        neighborType := GetType(CellIndex(nx, ny));
+                        if ((neighborType = FIRE) or else (neighborType = LAVA) or else (neighborType = STEAM)) and then Chance(25) then
+                            PutCell(currentIndex, WATER, 0)
+                    end;
+                    dx := dx + 1
+                end;
+                dy := dy + 1
+            end;
+            MarkUpdated(currentIndex);
+            return
+        end;
+
+        MarkUpdated(currentIndex)
+    end;
+
+    procedure StepSim;
+    begin
+        integer count;
+        integer x;
+        integer y;
+        integer index;
+        if (gWidth <= 0) or else (gHeight <= 0) then return;
+        count := gWidth * gHeight;
+        updated := AllocateBytes(c_size(count), c_size(1));
+        if updated = c_ptr(c_uchar)(0) then return;
+
+        y := gHeight - 1;
+        while y >= 0 do
+        begin
+            x := 0;
+            while x < gWidth do
+            begin
+                index := CellIndex(x, y);
+                if not IsUpdated(index) then ProcessCell(x, y, index);
+                x := x + 1
+            end;
+            y := y - 1
+        end;
+        FreeBytes(updated)
+    end;
+
+    integer function ColorPair(integer pair);
+    begin
+        return pair shl 8
+    end;
+
+    procedure PutCh(c_ptr(NCWindow) screen, integer y, integer x, integer ch);
+    begin
+        wmove(screen, c_int(y), c_int(x));
+        waddch(screen, c_uint(ch))
+    end;
+
+    procedure PutN(c_ptr(NCWindow) screen, integer y, integer x, string value, integer count);
+    begin
+        mvwaddnstr(screen, c_int(y), c_int(x), value, c_int(count))
+    end;
+
+    string function BrushString(integer brush);
+    begin
+        if brush = 1 then return "1";
+        if brush = 2 then return "2";
+        if brush = 3 then return "3";
+        if brush = 4 then return "4";
+        if brush = 5 then return "5";
+        if brush = 6 then return "6";
+        if brush = 7 then return "7";
+        if brush = 8 then return "8";
+        return "?"
+    end;
+
+    procedure DrawGrid(c_ptr(NCWindow) screen, integer cx, integer cy, integer current, boolean paused, integer brush);
+    begin
+        integer x;
+        integer y;
+        integer index;
+        integer element;
+        integer life;
+        integer glyph;
+        integer color;
+        integer maxy;
+        integer maxx;
+        string status;
+        string info;
+        string currentName;
+        y := 0;
+        while y < gHeight do
+        begin
+            x := 0;
+            while x < gWidth do
+            begin
+                index := CellIndex(x, y);
+                element := GetType(index);
+                life := GetLife(index);
+                glyph := GlyphOf(element);
+                if element = HUMAN then
+                begin
+                    if ((life // 6) mod 2) <> 0 then glyph := 121 else glyph := 89
+                end;
+                if element = ZOMBIE then
+                begin
+                    if ((life // 6) mod 2) <> 0 then glyph := 116 else glyph := 84
+                end;
+                if element = LIGHTNING then glyph := 124;
+                color := ColorOf(element);
+                if ((element = WATER) or else (element = SALTWATER)) and then (life > 0) then color := 9;
+                if has_colors() then attron(c_int(ColorPair(color)));
+                PutCh(screen, y, x, glyph);
+                if has_colors() then attroff(c_int(ColorPair(color)));
+                x := x + 1
+            end;
+            y := y + 1
+        end;
+
+        attron(c_int(A_REVERSE));
+        PutCh(screen, cy, cx, 43);
+        attroff(c_int(A_REVERSE));
+
+        maxy := integer(getmaxy(screen));
+        maxx := integer(getmaxx(screen));
+        if gHeight < maxy then
+        begin
+            x := 0;
+            while x < maxx do
+            begin
+                PutCh(screen, gHeight, x, 45);
+                x := x + 1
+            end
+        end;
+
+        status := "Move: Arrows/WASD | Space: draw | E: erase | +/-: brush | C/X: clear | P: pause | M/Tab: elements | Q: quit";
+        if status.length > maxx then status := status.slice(0, maxx);
+        if (gHeight + 1) < maxy then PutN(screen, gHeight + 1, 0, status, maxx);
+
+        currentName := NameOf(current);
+        info := "Current: " + currentName + " | Brush r=" + BrushString(brush);
+        if paused then info := info + " [PAUSED]";
+        if info.length > maxx then info := info.slice(0, maxx);
+        if (gHeight + 2) < maxy then PutN(screen, gHeight + 2, 0, info, maxx)
+    end;
+
+    string function CategoryName(integer category);
+    begin
+        if category = POWDERS then return "Powders";
+        if category = LIQUIDS then return "Liquids";
+        if category = SOLIDS then return "Solids";
+        if category = GASES then return "Gases";
+        if category = SPECIAL then return "Special";
+        if category = CREDITS then return "Credits";
+        return "?"
+    end;
+
+    integer function TabItemCount(integer category);
+    begin
+        if category = POWDERS then return 4;
+        if category = LIQUIDS then return 7;
+        if category = SOLIDS then return 12;
+        if category = GASES then return 6;
+        if category = SPECIAL then return 5;
+        if category = CREDITS then return 1;
+        return 0
+    end;
+
+    integer function TabElement(integer category, integer item);
+    begin
+        if category = POWDERS then
+        begin
+            if item = 0 then return SAND;
+            if item = 1 then return GUNPOWDER;
+            if item = 2 then return ASH;
+            return SNOW
+        end;
+        if category = LIQUIDS then
+        begin
+            if item = 0 then return WATER;
+            if item = 1 then return SALTWATER;
+            if item = 2 then return OIL;
+            if item = 3 then return ETHANOL;
+            if item = 4 then return ACID;
+            if item = 5 then return LAVA;
+            return MERCURY
+        end;
+        if category = SOLIDS then
+        begin
+            if item = 0 then return STONE;
+            if item = 1 then return GLASS;
+            if item = 2 then return WALL;
+            if item = 3 then return WOOD;
+            if item = 4 then return PLANT;
+            if item = 5 then return SEAWEED;
+            if item = 6 then return METAL;
+            if item = 7 then return WIRE;
+            if item = 8 then return ICE;
+            if item = 9 then return COAL;
+            if item = 10 then return DIRT;
+            return WET_DIRT
+        end;
+        if category = GASES then
+        begin
+            if item = 0 then return SMOKE;
+            if item = 1 then return STEAM;
+            if item = 2 then return GAS;
+            if item = 3 then return TOXIC_GAS;
+            if item = 4 then return HYDROGEN;
+            return CHLORINE
+        end;
+        if category = SPECIAL then
+        begin
+            if item = 0 then return FIRE;
+            if item = 1 then return LIGHTNING;
+            if item = 2 then return HUMAN;
+            if item = 3 then return ZOMBIE;
+            return EMPTY
+        end;
+        return EMPTY
+    end;
+
+    string function MenuLabel(integer category, integer item);
+    begin
+        if category = CREDITS then return "Credits";
+        return NameOf(TabElement(category, item))
+    end;
+
+    string function MenuDescription(integer category, integer item);
+    begin
+        if category = POWDERS then
+        begin
+            if item = 0 then return "Classic falling grains.";
+            if item = 1 then return "Explodes when ignited.";
+            if item = 2 then return "Burnt residue.";
+            return "Melts near heat."
+        end;
+        if category = LIQUIDS then
+        begin
+            if item = 0 then return "Flows, cools, extinguishes.";
+            if item = 1 then return "Conductive water.";
+            if item = 2 then return "Light, flammable.";
+            if item = 3 then return "Very flammable.";
+            if item = 4 then return "Dissolves many materials.";
+            if item = 5 then return "Hot molten rock.";
+            return "Heavy liquid metal."
+        end;
+        if category = SOLIDS then
+        begin
+            if item = 0 then return "Heavy solid block.";
+            if item = 1 then return "From sand + lava.";
+            if item = 2 then return "Indestructible barrier.";
+            if item = 3 then return "Flammable solid.";
+            if item = 4 then return "Grows on wet dirt.";
+            if item = 5 then return "Grows in water over sand.";
+            if item = 6 then return "Conductive solid.";
+            if item = 7 then return "Conductive path.";
+            if item = 8 then return "Melts into water.";
+            if item = 9 then return "Burns longer.";
+            if item = 10 then return "Gets wet; grows plants.";
+            return "Dries over time."
+        end;
+        if category = GASES then
+        begin
+            if item = 0 then return "Rises; may fall as ash.";
+            if item = 1 then return "Condenses to water.";
+            if item = 2 then return "Neutral rising gas.";
+            if item = 3 then return "Nasty chemical cloud.";
+            if item = 4 then return "Very light, explosive.";
+            return "Harms plants."
+        end;
+        if category = SPECIAL then
+        begin
+            if item = 0 then return "Burns & flickers upward.";
+            if item = 1 then return "Yellow electrical bolt.";
+            if item = 2 then return "Avoids zombie, fights back.";
+            if item = 3 then return "Chases and infects humans.";
+            return "Place empty space."
+        end;
+        return "Show credits & license."
+    end;
+
+    integer function TabForElement(integer element);
+    begin
+        if Sandlike(element) then return POWDERS;
+        if Liquid(element) then return LIQUIDS;
+        if Solid(element) then return SOLIDS;
+        if Gas(element) then return GASES;
+        return SPECIAL
+    end;
+
+    string function CreditLine(integer index);
+    begin
+        if index = 0 then return "Terminal Powder Toy-like Sandbox";
+        if index = 1 then return "Author: Robert";
+        if index = 2 then return "GitHub: https://github.com/RobertFlexx";
+        if index = 3 then return "Language: Free Simula + ncurses";
+        if index = 4 then return "";
+        if index = 5 then return "BSD 3-Clause License (snippet):";
+        if index = 6 then return "Redistribution and use in source and binary forms,";
+        if index = 7 then return "with or without modification, are permitted provided";
+        if index = 8 then return "that the following conditions are met:";
+        if index = 9 then return "1) Source redistributions retain this notice & disclaimer.";
+        if index = 10 then return "2) Binary redistributions reproduce this notice & disclaimer.";
+        if index = 11 then return "3) Names of contributors can't be used to endorse products";
+        if index = 12 then return "   derived from this software without permission.";
+        if index = 13 then return "";
+        return "Press any key to return."
+    end;
+
+    procedure ShowCreditsOverlay(c_ptr(NCWindow) screen);
+    begin
+        integer maxy;
+        integer maxx;
+        integer width;
+        integer height;
+        integer top;
+        integer left;
+        integer y;
+        integer i;
+        integer titleX;
+        c_ptr(NCWindow) window;
+        string title;
+        string line;
+        maxy := integer(getmaxy(screen));
+        maxx := integer(getmaxx(screen));
+        if (maxx < 40) or else (maxy < 12) then return;
+        width := MinInt(maxx - 4, 70);
+        height := MinInt(maxy - 4, 15);
+        top := (maxy - height) // 2;
+        left := (maxx - width) // 2;
+        window := newwin(c_int(height), c_int(width), c_int(top), c_int(left));
+        if window = c_ptr(NCWindow)(0) then return;
+        box(window, c_uint(0), c_uint(0));
+        title := " Credits ";
+        titleX := (width - title.length) // 2;
+        mvwaddnstr(window, c_int(0), c_int(titleX), title, c_int(width - 2));
+        y := 2;
+        i := 0;
+        while i < 15 do
+        begin
+            if y >= (height - 1) then i := 15
+            else
+            begin
+                line := CreditLine(i);
+                mvwaddnstr(window, c_int(y), c_int(2), line, c_int(width - 4));
+                i := i + 1;
+                y := y + 1
+            end
+        end;
+        wrefresh(window);
+        flushinp();
+        wgetch(window);
+        delwin(window)
+    end;
+
+    integer function ElementMenu(c_ptr(NCWindow) screen, integer current);
+    begin
+        integer tabIndex;
+        integer sel;
+        integer result;
+        integer count;
+        integer maxy;
+        integer maxx;
+        integer boxWidth;
+        integer boxHeight;
+        integer left;
+        integer top;
+        integer right;
+        integer bottom;
+        integer tabsY;
+        integer cx;
+        integer y;
+        integer x;
+        integer i;
+        integer maxListY;
+        c_uint ch;
+        integer element;
+        boolean done;
+        string title;
+        string tab;
+        string line;
+        string hint;
+        string itemLabel;
+        string description;
+
+        tabIndex := TabForElement(current);
+        sel := 0;
+        done := false;
+        result := current;
+
+        while not done do
+        begin
+            maxy := integer(getmaxy(screen));
+            maxx := integer(getmaxx(screen));
+            if tabIndex = POWDERS then count := 4
+            else if tabIndex = LIQUIDS then count := 7
+            else if tabIndex = SOLIDS then count := 12
+            else if tabIndex = GASES then count := 6
+            else if tabIndex = SPECIAL then count := 5
+            else count := 1;
+            if sel < 0 then sel := 0;
+            if sel >= count then sel := count - 1;
+
+            boxWidth := MaxInt(44, maxx - 6);
+            boxHeight := MaxInt(14, maxy - 6);
+            boxWidth := MinInt(boxWidth, maxx);
+            boxHeight := MinInt(boxHeight, maxy);
+            left := (maxx - boxWidth) // 2;
+            top := (maxy - boxHeight) // 2;
+            right := left + boxWidth - 1;
+            bottom := top + boxHeight - 1;
+
+            clear();
+            PutCh(screen, top, left, 43);
+            PutCh(screen, top, right, 43);
+            PutCh(screen, bottom, left, 43);
+            PutCh(screen, bottom, right, 43);
+            x := left + 1;
+            while x < right do
+            begin
+                PutCh(screen, top, x, 45);
+                PutCh(screen, bottom, x, 45);
+                x := x + 1
+            end;
+            y := top + 1;
+            while y < bottom do
+            begin
+                PutCh(screen, y, left, 124);
+                PutCh(screen, y, right, 124);
+                y := y + 1
+            end;
+
+            title := " Element Browser ";
+            PutN(screen, top, left + ((boxWidth - title.length) // 2), title, boxWidth - 2);
+
+            tabsY := top + 1;
+            cx := left + 2;
+            i := 0;
+            while i < TAB_COUNT do
+            begin
+                tab := " " + CategoryName(i) + " ";
+                if (cx + tab.length) >= right then i := TAB_COUNT
+                else
+                begin
+                    if i = tabIndex then attron(c_int(A_REVERSE));
+                    PutN(screen, tabsY, cx, tab, right - cx - 1);
+                    if i = tabIndex then attroff(c_int(A_REVERSE));
+                    cx := cx + tab.length + 1;
+                    i := i + 1
+                end
+            end;
+
+            y := top + 3;
+            maxListY := bottom - 3;
+            i := 0;
+            while i < count do
+            begin
+                if y > maxListY then i := count
+                else
+                begin
+                    itemLabel := MenuLabel(tabIndex, i);
+                    description := MenuDescription(tabIndex, i);
+                    line := " " + itemLabel + " - " + description;
+                    if line.length > (boxWidth - 4) then line := line.slice(0, boxWidth - 4);
+                    if i = sel then attron(c_int(A_REVERSE));
+                    PutN(screen, y, left + 2, line, boxWidth - 4);
+                    if i = sel then attroff(c_int(A_REVERSE));
+                    i := i + 1;
+                    y := y + 1
+                end
+            end;
+
+            hint := "Left/Right: tabs | Up/Down: select | Enter: choose | ESC: back";
+            PutN(screen, bottom - 1, left + 2, hint, boxWidth - 4);
+            refresh();
+
+            ch := c_uint(wgetch(screen));
+            if ch = c_uint(KEY_LEFT) then
+            begin
+                tabIndex := (tabIndex + TAB_COUNT - 1) mod TAB_COUNT;
+                sel := 0
+            end
+            else if ch = c_uint(KEY_RIGHT) then
+            begin
+                tabIndex := (tabIndex + 1) mod TAB_COUNT;
+                sel := 0
+            end
+            else if ch = c_uint(KEY_UP) then
+            begin
+                if count > 0 then sel := (sel + count - 1) mod count
+            end
+            else if ch = c_uint(KEY_DOWN) then
+            begin
+                if count > 0 then sel := (sel + 1) mod count
+            end
+            else if (ch = c_uint(10)) or else (ch = c_uint(13)) or else (ch = c_uint(KEY_ENTER)) then
+            begin
+                if count > 0 then
+                begin
+                    if tabIndex = CREDITS then ShowCreditsOverlay(screen)
+                    else
+                    begin
+                        element := TabElement(tabIndex, sel);
+                        result := element;
+                        done := true
+                    end
+                end
+                else done := true
+            end
+            else if ch = c_uint(27) then done := true
+        end;
+        return result
+    end;
+
+    Public:
+    procedure Run;
+    begin
+            c_ptr(NCWindow) screen;
+            Timespec timestamp;
+            long integer seed;
+            integer termHeight;
+            integer termWidth;
+            integer simHeight;
+            integer newHeight;
+            integer newWidth;
+            integer newSimHeight;
+            integer cx;
+            integer cy;
+            integer brush;
+            integer current;
+            c_uint ch;
+            boolean running;
+            boolean paused;
+
+            gridReady := false;
+            clock_gettime(c_int(0), c_addr(timestamp));
+            seed := (long integer(timestamp.tv_sec) * 1000000000 + long integer(timestamp.tv_nsec)) and U32_MASK;
+            SeedRng(seed);
+
+            screen := initscr();
+            cbreak();
+            noecho();
+            curs_set(c_int(0));
+            keypad(screen, c_bool(true));
+            nodelay(screen, c_bool(true));
+
+            termHeight := integer(getmaxy(screen));
+            termWidth := integer(getmaxx(screen));
+            simHeight := MaxInt(1, termHeight - 3);
+            InitGrid(termWidth, simHeight);
+
+            if has_colors() then
+            begin
+                start_color();
+                use_default_colors();
+                init_pair(c_short(1), c_short(COLOR_BLACK), c_short(-1));
+                init_pair(c_short(2), c_short(COLOR_YELLOW), c_short(-1));
+                init_pair(c_short(3), c_short(COLOR_CYAN), c_short(-1));
+                init_pair(c_short(4), c_short(COLOR_WHITE), c_short(-1));
+                init_pair(c_short(5), c_short(COLOR_GREEN), c_short(-1));
+                init_pair(c_short(6), c_short(COLOR_RED), c_short(-1));
+                init_pair(c_short(7), c_short(COLOR_MAGENTA), c_short(-1));
+                init_pair(c_short(8), c_short(COLOR_BLUE), c_short(-1));
+                init_pair(c_short(9), c_short(COLOR_YELLOW), c_short(-1))
+            end;
+
+            cx := gWidth // 2;
+            cy := gHeight // 2;
+            brush := 1;
+            current := SAND;
+            running := true;
+            paused := false;
+
+            while running do
+            begin
+                newHeight := integer(getmaxy(screen));
+                newWidth := integer(getmaxx(screen));
+                newSimHeight := MaxInt(1, newHeight - 3);
+                if (newWidth <> gWidth) or else (newSimHeight <> gHeight) then
+                begin
+                    InitGrid(newWidth, newSimHeight);
+                    cx := ClampInt(cx, 0, gWidth - 1);
+                    cy := ClampInt(cy, 0, gHeight - 1)
+                end;
+
+                ch := c_uint(wgetch(screen));
+                while ch <> c_uint(4294967295) do
+                begin
+                    if (ch = c_uint(113)) or else (ch = c_uint(81)) then running := false
+                    else if (ch = c_uint(KEY_LEFT)) or else (ch = c_uint(97)) or else (ch = c_uint(65)) then cx := MaxInt(0, cx - 1)
+                    else if (ch = c_uint(KEY_RIGHT)) or else (ch = c_uint(100)) or else (ch = c_uint(68)) then cx := MinInt(gWidth - 1, cx + 1)
+                    else if (ch = c_uint(KEY_UP)) or else (ch = c_uint(119)) then cy := MaxInt(0, cy - 1)
+                    else if (ch = c_uint(KEY_DOWN)) or else (ch = c_uint(115)) or else (ch = c_uint(83)) then cy := MinInt(gHeight - 1, cy + 1)
+                    else if ch = c_uint(32) then PlaceBrush(cx, cy, brush, current)
+                    else if (ch = c_uint(101)) or else (ch = c_uint(69)) then PlaceBrush(cx, cy, brush, EMPTY)
+                    else if (ch = c_uint(43)) or else (ch = c_uint(61)) then
+                    begin
+                        if brush < 8 then brush := brush + 1
+                    end
+                    else if (ch = c_uint(45)) or else (ch = c_uint(95)) then
+                    begin
+                        if brush > 1 then brush := brush - 1
+                    end
+                    else if (ch = c_uint(99)) or else (ch = c_uint(67)) or else (ch = c_uint(120)) or else (ch = c_uint(88)) then ClearGrid
+                    else if (ch = c_uint(112)) or else (ch = c_uint(80)) then paused := not paused
+                    else if (ch = c_uint(109)) or else (ch = c_uint(77)) or else (ch = c_uint(9)) then
+                    begin
+                        flushinp();
+                        nodelay(screen, c_bool(false));
+                        current := ElementMenu(screen, current);
+                        nodelay(screen, c_bool(true))
+                    end
+                    else if ch = c_uint(49) then current := SAND
+                    else if ch = c_uint(50) then current := WATER
+                    else if ch = c_uint(51) then current := STONE
+                    else if ch = c_uint(52) then current := WOOD
+                    else if ch = c_uint(53) then current := FIRE
+                    else if ch = c_uint(54) then current := OIL
+                    else if ch = c_uint(55) then current := LAVA
+                    else if ch = c_uint(56) then current := PLANT
+                    else if ch = c_uint(57) then current := GUNPOWDER
+                    else if ch = c_uint(48) then current := ACID
+                    else if ch = c_uint(87) then current := WALL
+                    else if ch = c_uint(76) then current := LIGHTNING
+                    else if (ch = c_uint(72)) or else (ch = c_uint(104)) then current := HUMAN
+                    else if ch = c_uint(90) then current := ZOMBIE
+                    else if ch = c_uint(68) then current := DIRT;
+                    ch := c_uint(wgetch(screen))
+                end;
+
+                if not paused then StepSim;
+                erase();
+                DrawGrid(screen, cx, cy, current, paused, brush);
+                refresh();
+                napms(c_int(16))
+            end;
+
+            endwin();
+            if gridReady then FreeCells(grid);
+            exit(0)
+    end
+end;
+
+begin
+    ref(PowderSandboxApp) app;
+    app :- new PowderSandboxApp;
+    app.Run
+end.
